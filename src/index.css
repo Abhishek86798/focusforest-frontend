@@ -1,0 +1,67 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+/* ──────────────────────────────────────────────────────────────────────────────
+   FocusForest Design Tokens
+   Source: Figma file 2anSQ4OFmupF8rhaWv8XFg, node 27:6 (Colors section)
+   ────────────────────────────────────────────────────────────────────────────── */
+:root {
+  /* ── Core palette (from Figma) ── */
+  --color-green:       #006D37;           /* Primary green — buttons, active states */
+  --color-light-green: rgba(187, 233, 194, 0.50); /* Subtle green tint — badges, tags */
+  --color-blue:        #3598DB;           /* Accent blue — links, info states */
+  --color-black:       #1A1A1A;           /* Primary text, borders */
+  --color-white:       #F2F2F2;           /* Page background */
+  --color-super-white: #FAFAFA;           /* Card / sidebar background */
+
+  /* ── Semantic aliases ── */
+  --bg-page:           var(--color-white);
+  --bg-card:           var(--color-super-white);
+  --bg-sidebar:        var(--color-super-white);
+  --color-primary:     var(--color-green);
+  --color-text:        var(--color-black);
+  --color-border:      var(--color-black);
+
+  /* ── Neo-brutalist shadow (4px offset black) ── */
+  --shadow-neo:        4px 4px 0px 0px #1A1A1A;
+  --shadow-neo-sm:     2px 2px 0px 0px #1A1A1A;
+
+  /* ── Typography ── */
+  --font-heading:      'Space Grotesk', sans-serif;
+  --font-body:         'Inter', sans-serif;
+  --font-mono:         'JetBrains Mono', monospace;
+}
+
+/* ── Global reset ── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html {
+  font-size: 16px;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+body {
+  font-family: var(--font-body);
+  background: var(--bg-page);
+  color: var(--color-text);
+  line-height: 1.5;
+}
+
+/* ── Focus outline ── */
+:focus-visible {
+  outline: 2px solid var(--color-green);
+  outline-offset: 2px;
+}
+
+/* ── Scrollbar (minimal) ── */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(26, 26, 26, 0.15); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(26, 26, 26, 0.3); }
