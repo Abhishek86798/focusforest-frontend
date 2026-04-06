@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSessionStore } from '../stores/sessionStore';
+import { useIsMobile } from '../hooks/useIsMobile';
 import type { SessionVariant } from '../types';
 
 export interface VariantPickerModalProps {
@@ -128,6 +129,7 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
     alwaysUseVariant, setAlwaysUse,
     customFocusMinutes, customBreakMinutes, setCustomTimes,
   } = useSessionStore();
+  const isMobile = useIsMobile();
 
   const [customFocusRaw, setCustomFocusRaw] = useState(String(customFocusMinutes));
   const [customBreakRaw, setCustomBreakRaw] = useState(String(customBreakMinutes));
@@ -160,8 +162,7 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
             }}
           />
 
-          {/* ── Modal — matches Figma frame 42:2: 1272×892, fills: White (#F2F2F2)
-                Centered on screen, NOT a bottom sheet ── */}
+          {/* Modal */}
           <motion.div
             initial={{ opacity: 0, scale: 0.96 }}
             animate={{ opacity: 1, scale: 1 }}
@@ -170,43 +171,37 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
             style={{
               position: 'fixed',
               top: '50%', left: '50%',
-              translateX: '-50%',
-              translateY: '-50%',
+              transform: 'translate(-50%, -50%)',
               zIndex: 50,
-              width: 'min(1272px, 96vw)',
-              maxHeight: '90vh',
+              width: isMobile ? 'calc(100vw - 32px)' : 'min(1272px, 96vw)',
+              maxHeight: isMobile ? '85vh' : '90vh',
               overflowY: 'auto',
-              background: '#F2F2F2',   // Figma: fills White = #F2F2F2
-              borderRadius: '16px',
-              padding: '66px 65px 80px',
+              background: '#F2F2F2',
+              borderRadius: isMobile ? '12px' : '16px',
+              padding: isMobile ? '24px 20px 32px' : '66px 65px 80px',
               boxSizing: 'border-box',
             }}
           >
-            {/* ── Header: Frame 20 — layout_SPLHAO: column, gap=10, x=65, y=66  ── */}
-            {/* Frame 19: row, alignItems=center, gap=635 (space-between), w=1143 */}
+            {/* Header */}
             <div style={{
-              display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 97,
+              display: 'flex', flexDirection: 'column', gap: 10, marginBottom: isMobile ? 24 : 97,
             }}>
-              {/* "Configuration" — style_N68KWA: Inter 400, 16px */}
               <span style={{
-                fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: 16,
+                fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: isMobile ? 12 : 16,
                 color: '#1A1A1A', lineHeight: '1.21em',
               }}>
                 Configuration
               </span>
 
-              {/* Row: title left + × right */}
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                {/* "Select Timer Variant" — style_EBXCPC: Space Grotesk 700, 48px */}
                 <h2 style={{
                   margin: 0,
-                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 48,
+                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? 24 : 48,
                   color: '#1A1A1A', lineHeight: '1.276em',
                 }}>
                   Select Timer Variant
                 </h2>
 
-                {/* Close ×  — icon node 46:353, 18×18, fills: Black */}
                 <button
                   onClick={onClose}
                   style={{
@@ -221,13 +216,12 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
               </div>
             </div>
 
-            {/* ── 4 Preset Cards Row ──
-                Figma: cards at y=213.97, x positions: 65(1), 361(2), 656(3), 951(4)
-                → gap ≈ 296-257=~35px  */}
+            {/* 4 Preset Cards */}
             <div style={{
-              display: 'flex', flexDirection: 'row',
-              gap: 35, justifyContent: 'flex-start',
-              marginBottom: 40,
+              display: 'grid',
+              gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+              gap: isMobile ? 12 : 35,
+              marginBottom: isMobile ? 24 : 40,
             }}>
               {PRESET_VARIANTS.map((v) => {
                 const isActive = v.id === selectedVariant;
@@ -248,31 +242,31 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
                       if (isActive) setAlwaysUse(!alwaysUseVariant);
                       else { setVariant(v.id); setAlwaysUse(true); }
                     }}
+                    isMobile={isMobile}
                   />
                 );
               })}
             </div>
 
-            {/* ── Custom Card — Figma: x=508, y=561, 256×285, centred below row ── */}
+            {/* Custom Card */}
             <div style={{ display: 'flex', justifyContent: 'center' }}>
               {(() => {
                 const isActive = selectedVariant === 'custom';
                 return (
                   <div
                     onClick={() => setVariant('custom')}
-                    style={{ position: 'relative', cursor: 'pointer', width: 256 }}
+                    style={{ position: 'relative', cursor: 'pointer', width: isMobile ? '100%' : 256, maxWidth: 256 }}
                   >
-                    {/* Active badge — layout_TLWW46: x=211.33, y=0, 72.35×40.07, fills: Green */}
                     {isActive && (
                       <div style={{
-                        position: 'absolute', top: 0, right: -15,
+                        position: 'absolute', top: 0, right: isMobile ? 0 : -15,
                         background: '#006D37',
                         borderRadius: '0 12px 0 12px',
-                        padding: '10px 16px',
+                        padding: isMobile ? '6px 10px' : '10px 16px',
                         zIndex: 1,
                       }}>
                         <span style={{
-                          fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 12,
+                          fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: isMobile ? 10 : 12,
                           color: '#E8E8E8', lineHeight: '1.21em',
                         }}>
                           Active
@@ -280,52 +274,47 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
                       </div>
                     )}
 
-                    {/* Card body — layout_WM3RI3: 256×285, fills: Super White (#FAFAFA) */}
                     <div style={{
-                      width: 256, minHeight: 285,
+                      width: '100%', minHeight: isMobile ? 200 : 285,
                       background: '#FAFAFA',
                       border: isActive ? '3px solid #006D37' : '1px solid rgba(26,26,26,0.12)',
                       borderRadius: 12,
-                      padding: '0 0 24px',
+                      padding: isMobile ? '0 0 16px' : '0 0 24px',
                       boxSizing: 'border-box',
                       position: 'relative',
                       transition: 'border-color 0.15s, box-shadow 0.15s',
                       boxShadow: isActive ? '0 8px 28px rgba(0,109,55,0.14)' : 'none',
                     }}>
-                      {/* Icons row: icon left, radio right — same as preset cards */}
                       <div style={{
                         display: 'flex', flexDirection: 'row',
                         justifyContent: 'space-between', alignItems: 'center',
-                        padding: '41px 26px 0',
+                        padding: isMobile ? '24px 16px 0' : '41px 26px 0',
                       }}>
                         <IconSliders />
                         <CardRadio isActive={isActive} />
                       </div>
 
-                      {/* Frame 22 — layout_99H9WS: row, justifyContent: space-between, alignItems: flex-end, y=93 */}
                       <div style={{
                         display: 'flex', flexDirection: 'row',
                         justifyContent: 'space-between', alignItems: 'flex-end',
-                        padding: '0 26px',
+                        padding: isMobile ? '0 16px' : '0 26px',
                         marginTop: 12,
                       }}>
-                        {/* Title column: heading + desc, gap=4 */}
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                           <span style={{
-                            fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 22,
+                            fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? 16 : 22,
                             color: '#1A1A1A', lineHeight: '1.27em',
                           }}>
                             Custom
                           </span>
                           <span style={{
-                            fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: 13,
+                            fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: isMobile ? 11 : 13,
                             color: '#006D37', lineHeight: '1.4em',
                           }}>
                             Your time variant
                           </span>
                         </div>
 
-                        {/* Always Use pill — layout_T6WX5D: 58×16, strokes: Black 0.5px */}
                         <div
                           style={{
                             border: '0.5px solid #1A1A1A',
@@ -341,7 +330,7 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
                           }}
                         >
                           <span style={{
-                            fontFamily: "'Inter', sans-serif", fontWeight: 500, fontSize: 10,
+                            fontFamily: "'Inter', sans-serif", fontWeight: 500, fontSize: isMobile ? 8 : 10,
                             textTransform: 'uppercase', letterSpacing: '0.06em',
                             color: isActive && alwaysUseVariant ? '#006D37' : 'rgba(26,26,26,0.5)',
                           }}>
@@ -350,28 +339,22 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
                         </div>
                       </div>
 
-                      {/* Focus & Break input section
-                          Figma node 46:557: column, gap=12, padding=16px 0 0, x=26, y=172, w=204
-                          stroke_7PROIT: 1px top border rgba(26,28,28,0.1)
-                          node 46:561 (Focus input) / 46:566 (Break input): strokes: Black 0.5px */}
                       <div
                         style={{
                           display: 'flex', flexDirection: 'column', gap: 12,
                           borderTop: '1px solid rgba(26,28,28,0.1)',
-                          padding: '16px 26px 0',
+                          padding: isMobile ? '12px 16px 0' : '16px 26px 0',
                           marginTop: 16,
                         }}
                         onClick={(e) => e.stopPropagation()}
                       >
-                        {/* Focus row */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{
-                            fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: 14,
+                            fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: isMobile ? 12 : 14,
                             color: '#1A1A1A', lineHeight: '1.43em',
                           }}>
                             Focus
                           </span>
-                          {/* Input box — Figma: Container strokes: Black 0.5px */}
                           <input
                             type="number" min={1} max={999}
                             value={customFocusRaw}
@@ -380,12 +363,12 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
                             onFocus={() => setVariant('custom')}
                             placeholder="25"
                             style={{
-                              width: 52, height: 24,
+                              width: isMobile ? 44 : 52, height: isMobile ? 20 : 24,
                               border: '0.5px solid #1A1A1A',
                               borderRadius: 2,
                               padding: '0 5px',
                               fontFamily: "'Space Grotesk', sans-serif",
-                              fontWeight: 700, fontSize: 13,
+                              fontWeight: 700, fontSize: isMobile ? 11 : 13,
                               textAlign: 'center',
                               background: 'transparent',
                               outline: 'none',
@@ -395,10 +378,9 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
                           />
                         </div>
 
-                        {/* Break row */}
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <span style={{
-                            fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: 14,
+                            fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: isMobile ? 12 : 14,
                             color: '#1A1A1A', lineHeight: '1.43em',
                           }}>
                             Break
@@ -411,12 +393,12 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
                             onFocus={() => setVariant('custom')}
                             placeholder="5"
                             style={{
-                              width: 52, height: 24,
+                              width: isMobile ? 44 : 52, height: isMobile ? 20 : 24,
                               border: '0.5px solid #1A1A1A',
                               borderRadius: 2,
                               padding: '0 5px',
                               fontFamily: "'Space Grotesk', sans-serif",
-                              fontWeight: 700, fontSize: 13,
+                              fontWeight: 700, fontSize: isMobile ? 11 : 13,
                               textAlign: 'center',
                               background: 'transparent',
                               outline: 'none',
@@ -426,11 +408,10 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
                           />
                         </div>
 
-                        {/* Live preview */}
                         {isActive && customFocusRaw && customBreakRaw && (
                           <p style={{
                             margin: 0, marginTop: 2,
-                            fontFamily: "'Inter', sans-serif", fontSize: 11,
+                            fontFamily: "'Inter', sans-serif", fontSize: isMobile ? 9 : 11,
                             color: 'rgba(0,109,55,0.65)', fontStyle: 'italic',
                           }}>
                             {fmtMins(parseMins(customFocusRaw))} focus · {fmtMins(parseMins(customBreakRaw))} break
@@ -443,23 +424,22 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
               })()}
             </div>
 
-            {/* ── Bottom Actions ── */}
+            {/* Bottom Actions */}
             <div style={{
-              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 24,
-              marginTop: 64,
+              display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isMobile ? 16 : 24,
+              marginTop: isMobile ? 32 : 64,
             }}>
               <button
                 onClick={onContinue}
                 style={{
-                  width: 300, height: 64,
+                  width: isMobile ? '100%' : 300, height: isMobile ? 52 : 64,
+                  maxWidth: 300,
                   background: '#006D37', color: '#FAFAFA',
                   border: 'none', borderRadius: 6, cursor: 'pointer',
-                  fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 18,
+                  fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: isMobile ? 14 : 18,
                   textTransform: 'uppercase', letterSpacing: '0.05em',
                   transition: 'opacity 0.15s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.opacity = '0.88')}
-                onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
               >
                 Set Task for This Session
               </button>
@@ -468,12 +448,10 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
                 onClick={onContinue}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
-                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 16,
+                  fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? 12 : 16,
                   color: '#1A1A1A', textTransform: 'uppercase', letterSpacing: '0.1em',
                   transition: 'color 0.15s',
                 }}
-                onMouseEnter={e => (e.currentTarget.style.color = '#006D37')}
-                onMouseLeave={e => (e.currentTarget.style.color = '#1A1A1A')}
               >
                 Skip Task, Just Focus
               </button>
@@ -486,41 +464,36 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
 }
 
 // ─── PresetCard ───────────────────────────────────────────────────────────────
-// Figma: cards '1' (Sprint), '3' (DeepWork), '4' (Flow) = 256-257×285, Super White
-// Card '2' (Classic/active) = 256×282 + Active badge container 284×305
 function PresetCard({
-  title, desc, focus, breakT, icon, isActive, alwaysUse, onSelect, onAlwaysUse,
+  title, desc, focus, breakT, icon, isActive, alwaysUse, onSelect, onAlwaysUse, isMobile = false,
 }: {
   id?: SessionVariant; title: string; desc: string; focus: string; breakT: string;
   icon: React.ReactNode; isActive: boolean; alwaysUse: boolean;
   onSelect: () => void; onAlwaysUse: (e: React.MouseEvent) => void;
+  isMobile?: boolean;
 }) {
   return (
-    /* Active card wrapper is 284×305 (adds space for Active badge at top) */
     <div
       onClick={onSelect}
       style={{
         position: 'relative',
         cursor: 'pointer',
-        /* Figma: all cards same absolute x — gap handled in parent flex */
-        flex: '0 0 auto',
-        width: isActive ? 284 : 257,
-        paddingTop: isActive ? 20 : 0, // space for Active badge
+        flex: isMobile ? '1 1 auto' : '0 0 auto',
+        width: isMobile ? 'auto' : (isActive ? 284 : 257),
+        paddingTop: isActive ? (isMobile ? 12 : 20) : 0,
       }}
     >
-      {/* ── Active badge — layout_TLWW46: x=211.33, y=0, 72.35×40.07, fills: Green ── */}
       {isActive && (
         <div style={{
           position: 'absolute', top: 0, right: 0,
-          width: 72, height: 40,
+          width: isMobile ? 56 : 72, height: isMobile ? 28 : 40,
           background: '#006D37',
           borderRadius: '0 12px 0 12px',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           zIndex: 1,
         }}>
-          {/* style_FLCGFO: Inter 700, 12px, fills: Faded white (#E8E8E8) */}
           <span style={{
-            fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: 12,
+            fontFamily: "'Inter', sans-serif", fontWeight: 700, fontSize: isMobile ? 9 : 12,
             color: '#E8E8E8',
           }}>
             Active
@@ -528,10 +501,10 @@ function PresetCard({
         </div>
       )}
 
-      {/* ── Card body — layout_OFRIEM / layout_3QZ140: 256–257×282-285, Super White ── */}
       <div style={{
-        width: isActive ? 256 : 257,
-        height: 285,
+        width: isMobile ? '100%' : (isActive ? 256 : 257),
+        height: isMobile ? 'auto' : 285,
+        minHeight: isMobile ? 180 : 285,
         background: '#FAFAFA',
         borderRadius: 12,
         border: isActive
@@ -542,47 +515,47 @@ function PresetCard({
         overflow: 'hidden',
         boxSizing: 'border-box',
         transition: 'border-color 0.15s, box-shadow 0.15s',
+        padding: isMobile ? '16px 12px 12px' : 0,
       }}>
-        {/* ── Icons row — layout_ODPPO8 / layout_L3Z7RC:
-              row, justifyContent: space-between, gap=163.98, x=26, y=41 ── */}
+        {/* Icons row */}
         <div style={{
-          position: 'absolute', top: 41, left: 26,
-          width: 204,
+          position: isMobile ? 'relative' : 'absolute', 
+          top: isMobile ? 0 : 41, 
+          left: isMobile ? 0 : 26,
+          width: isMobile ? '100%' : 204,
           display: 'flex', flexDirection: 'row',
           justifyContent: 'space-between', alignItems: 'center',
+          marginBottom: isMobile ? 8 : 0,
         }}>
           {icon}
           <CardRadio isActive={isActive} />
         </div>
 
-        {/* ── Frame 22 — layout_6739CB / layout_99H9WS:
-              row, justifyContent: space-between, alignItems: flex-end, gap=38, x=26, y=93, w=213 ── */}
+        {/* Title & Always Use row */}
         <div style={{
-          position: 'absolute', top: 93, left: 26,
-          width: 213,
-          display: 'flex', flexDirection: 'row',
-          justifyContent: 'space-between', alignItems: 'flex-end',
-          gap: 38,
+          position: isMobile ? 'relative' : 'absolute', 
+          top: isMobile ? 0 : 93, 
+          left: isMobile ? 0 : 26,
+          width: isMobile ? '100%' : 213,
+          display: 'flex', flexDirection: isMobile ? 'column' : 'row',
+          justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'flex-end',
+          gap: isMobile ? 6 : 38,
         }}>
-          {/* Title column — layout_96XTC0 / layout_96XTC0: column, gap=4 */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-            {/* style_9SFL79 — from earlier data: heading text */}
             <span style={{
-              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 22,
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? 16 : 22,
               color: '#1A1A1A', lineHeight: '1.27em',
             }}>
               {title}
             </span>
-            {/* style_2M1ZC3: desc text, fills: Green */}
             <span style={{
-              fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: 13,
+              fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: isMobile ? 10 : 13,
               color: '#006D37', lineHeight: '1.4em',
             }}>
               {desc}
             </span>
           </div>
 
-          {/* Always Use pill — layout_T6WX5D: 58×16, strokes: Black 0.5px */}
           <div
             style={{
               flexShrink: 0,
@@ -596,7 +569,7 @@ function PresetCard({
             onClick={onAlwaysUse}
           >
             <span style={{
-              fontFamily: "'Inter', sans-serif", fontWeight: 500, fontSize: 9,
+              fontFamily: "'Inter', sans-serif", fontWeight: 500, fontSize: isMobile ? 7 : 9,
               textTransform: 'uppercase', letterSpacing: '0.06em',
               color: isActive && alwaysUse ? '#006D37' : 'rgba(26,26,26,0.45)',
               whiteSpace: 'nowrap',
@@ -606,44 +579,42 @@ function PresetCard({
           </div>
         </div>
 
-        {/* ── Focus & Break section — layout_5W86HW:
-              column, gap=12, padding=16px 0 0, x=26, y=172, w=204 ── */}
+        {/* Focus & Break section */}
         <div style={{
-          position: 'absolute', top: 172, left: 26,
-          width: 204,
+          position: isMobile ? 'relative' : 'absolute', 
+          top: isMobile ? 0 : 172, 
+          left: isMobile ? 0 : 26,
+          width: isMobile ? '100%' : 204,
           display: 'flex', flexDirection: 'column',
-          gap: 12,
+          gap: isMobile ? 8 : 12,
           borderTop: '1px solid rgba(26,28,28,0.1)',
-          paddingTop: 16,
+          paddingTop: isMobile ? 10 : 16,
+          marginTop: isMobile ? 10 : 0,
         }}>
-          {/* Focus row — layout_E1EASI: row, justifyContent: space-between */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            {/* style_D7POB4: Inter 400, 14px, fills: Black */}
             <span style={{
-              fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: 14,
+              fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: isMobile ? 11 : 14,
               color: '#1A1A1A', lineHeight: '1.43em',
             }}>
               Focus
             </span>
-            {/* style_R6VG0V: Space Grotesk 700, 14px */}
             <span style={{
-              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 14,
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? 11 : 14,
               color: '#1A1A1A', lineHeight: '1.43em',
             }}>
               {focus}
             </span>
           </div>
 
-          {/* Break row — layout_SRFGKE: row, justifyContent: space-between */}
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <span style={{
-              fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: 14,
+              fontFamily: "'Inter', sans-serif", fontWeight: 400, fontSize: isMobile ? 11 : 14,
               color: '#1A1A1A', lineHeight: '1.43em',
             }}>
               Break
             </span>
             <span style={{
-              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 14,
+              fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? 11 : 14,
               color: '#1A1A1A', lineHeight: '1.43em',
             }}>
               {breakT}

@@ -97,12 +97,12 @@ export default function SignupPage() {
 
   return (
     <div style={{
-      minHeight: '100vh',
+      minHeight: '100dvh',
       background: BG,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      padding: '24px',
+      padding: '16px',
       // subtle radial noise texture mimicking login page
       backgroundImage: `
         radial-gradient(ellipse 80% 60% at 80% 60%, rgba(45,106,48,0.18) 0%, transparent 60%),
@@ -126,7 +126,7 @@ export default function SignupPage() {
           background: CARD,
           border: `1px solid ${BORDER}`,
           borderRadius: '16px',
-          padding: '44px 40px',
+          padding: 'clamp(24px, 5vw, 44px) clamp(20px, 5vw, 40px)',
           boxShadow: '0 32px 64px rgba(0,0,0,0.45), 0 0 0 1px rgba(45,106,48,0.3)',
           fontFamily: "'DM Sans', sans-serif",
         }}

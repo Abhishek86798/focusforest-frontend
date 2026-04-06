@@ -1,28 +1,12 @@
 /**
- * LeaderboardPage — Figma node 159:815
- *
- * Canvas: 1728 × 1259 | Sidebar: w=101px | Main window: w=1627px
- *
- * Exact Figma measurements used:
- *  • Podium frame (layout_WJZ23G)  : x=106, y=242, w=1416, h=388
- *    - 2nd Place (layout_AVQ003)   : x=16,  w=440, h=284
- *    - 1st Place (layout_QPVA3A)   : x=488, w=440, h=388
- *    - 3rd Place                   : x=960, w=440
- *    → All columns equal (440px), gap=32px, outer margin=16px
- *  • Table (layout_774AGG)         : x=122, y=718, w=1384
- *    - Row padding                 : 20px 32px  (from layout_L5Q5RJ / TII344)
- *    - Highlighted row             : 24px 32px  (from layout_4PEMHA)
- *    - Header height: 63px, cols:
- *        Rank x=32 w=95 | Name x=143 w=652 | Trees x=811 w=318 | Streak x=1145 w=207
- *
- *  Horizontal padding:
- *    Podium  → 106/1627 = 6.5% of content width
- *    Table   → 122/1627 = 7.5% of content width
+ * LeaderboardPage — Responsive implementation
  */
 
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import Sidebar from '../components/Sidebar';
+import MobileBottomNav from '../components/MobileBottomNav';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const BG         = '#F2F2F2';
@@ -32,12 +16,10 @@ const DARK       = '#1A1A1A';
 const SHADOW     = '4px 4px 0px 0px rgba(26, 26, 26, 1)';
 
 // ─── Static data ───────────────────────────────────────────────────────────────
-// Figma: all three podium bars are the SAME width (440px each),
-// they differ only in height: 1st=192, 2nd=140, 3rd=112
 const PODIUM = [
-  { place: 2, name: 'Elena V.',      trees: '120 Trees', green: false, barH: 140, badgeSize: 80  },
-  { place: 1, name: 'Marcus Thorne', trees: '120 Trees', green: true,  barH: 192, badgeSize: 112 },
-  { place: 3, name: 'Julian K.',     trees: '120 Trees', green: false, barH: 112, badgeSize: 80  },
+  { place: 2, name: 'Elena V.',      trees: '120 Trees', green: false, barH: 140, barHMobile: 100, badgeSize: 80  },
+  { place: 1, name: 'Marcus Thorne', trees: '120 Trees', green: true,  barH: 192, barHMobile: 140, badgeSize: 112 },
+  { place: 3, name: 'Julian K.',     trees: '120 Trees', green: false, barH: 112, barHMobile: 80, badgeSize: 80  },
 ];
 
 const ROWS = [
@@ -48,14 +30,10 @@ const ROWS = [
 ];
 
 // ─── AvatarBadge ───────────────────────────────────────────────────────────────
-// Figma: border frame (OX7789: 80×80, stroke 2px, radius 12px, padding 4px)
-//        inner fill  (2PDJGJ: 32×32 centered — for 2nd/3rd)
-// For 1st: border is 112×112 (6QKNH7, stroke 4px, radius 12px, padding 4px)
-//           inner fill is 40×40 (84GL9F, green, radius centred inside)
-function AvatarBadge({ place, green }: { place: number; green: boolean }) {
-  const outer = green ? 112 : 80;
-  const innerSize = green ? 40 : 32;
-  const borderWidth = green ? 4 : 2;
+function AvatarBadge({ place, green, isMobile }: { place: number; green: boolean; isMobile: boolean }) {
+  const outer = isMobile ? (green ? 64 : 48) : (green ? 112 : 80);
+  const innerSize = isMobile ? (green ? 24 : 20) : (green ? 40 : 32);
+  const borderWidth = green ? (isMobile ? 2 : 4) : (isMobile ? 1 : 2);
   const borderColour = green ? GREEN : DARK;
 
   return (
@@ -65,14 +43,12 @@ function AvatarBadge({ place, green }: { place: number; green: boolean }) {
       position: 'relative',
       flexShrink: 0,
     }}>
-      {/* Outer border ring */}
       <div style={{
         position: 'absolute', inset: 0,
-        borderRadius: 12,
+        borderRadius: isMobile ? 8 : 12,
         border: `${borderWidth}px solid ${borderColour}`,
         boxSizing: 'border-box',
       }} />
-      {/* Inner fill with place number — absolutely centred */}
       <div style={{
         position: 'absolute',
         width: innerSize,
@@ -80,21 +56,17 @@ function AvatarBadge({ place, green }: { place: number; green: boolean }) {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        borderRadius: 8,
+        borderRadius: isMobile ? 4 : 8,
         background: green ? GREEN : BG,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        boxShadow: green
-          ? '0px 8px 10px -6px rgba(0,0,0,0.1), 0px 20px 25px -5px rgba(0,0,0,0.1)'
-          : 'none',
+        boxShadow: green ? '0px 8px 10px -6px rgba(0,0,0,0.1), 0px 20px 25px -5px rgba(0,0,0,0.1)' : 'none',
       }}>
-        {/* style_J1XPEE (2/3): Space Grotesk 900, 14px
-            style_5F2DJV (1):   Space Grotesk 900, 16px */}
         <span style={{
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: 900,
-          fontSize: green ? 16 : 14,
+          fontSize: isMobile ? (green ? 12 : 10) : (green ? 16 : 14),
           lineHeight: 1,
           color: green ? SUPERWHITE : DARK,
         }}>
@@ -106,17 +78,13 @@ function AvatarBadge({ place, green }: { place: number; green: boolean }) {
 }
 
 // ─── Podium ────────────────────────────────────────────────────────────────────
-// Three equal columns (flex: 1 each) with 32px gap between them.
-// Outer container has 16px padding on each side (matching Figma x=16 for 2nd/3rd).
-// The parent wrapper adds the 6.5% page-level padding.
-function Podium() {
+function Podium({ isMobile }: { isMobile: boolean }) {
   return (
-    // inner: 16px edge margins, 32px col gaps — matches layout_AVQ003 / QPVA3A positions
     <div style={{
       display: 'flex',
       alignItems: 'flex-end',
-      gap: 32,
-      padding: '0 16px',
+      gap: isMobile ? 12 : 32,
+      padding: isMobile ? '0 8px' : '0 16px',
       width: '100%',
       boxSizing: 'border-box',
     }}>
@@ -127,24 +95,23 @@ function Podium() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: i * 0.1, duration: 0.35 }}
           style={{
-            flex: 1,            // all three columns equal (440px each in Figma)
+            flex: 1,
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
           }}
         >
-          {/* Name — style_JPYRDY (2,3): Space Grotesk 700, 18px, centre
-                    style_KIVBQ7 (1)  : Space Grotesk 900, 24px, −2.5% ls */}
+          {/* Name */}
           <div style={{
-            paddingBottom: 16,
-            paddingTop: 16,
+            paddingBottom: isMobile ? 8 : 16,
+            paddingTop: isMobile ? 8 : 16,
             textAlign: 'center',
             width: '100%',
           }}>
             <span style={{
               fontFamily: "'Space Grotesk', sans-serif",
               fontWeight: p.green ? 900 : 700,
-              fontSize: p.green ? 24 : 18,
+              fontSize: isMobile ? (p.green ? 14 : 12) : (p.green ? 24 : 18),
               letterSpacing: p.green ? '-0.025em' : '0',
               lineHeight: p.green ? 1.333 : 1.556,
               color: DARK,
@@ -155,13 +122,10 @@ function Podium() {
             </span>
           </div>
 
-          {/* Bar — Figma style_W4NMUP: Space Grotesk 700, 40px, UPPER, lh=3.2em
-              1st: green fill + black 2px stroke + drop shadow, h=192
-              2nd: superwhite fill + black 1px stroke + drop shadow, h=140
-              3rd: superwhite fill + black 1px stroke + drop shadow, h=112  */}
+          {/* Bar */}
           <div style={{
             width: '100%',
-            height: p.barH,
+            height: isMobile ? p.barHMobile : p.barH,
             background: p.green ? GREEN : SUPERWHITE,
             border: `${p.green ? 2 : 1}px solid ${DARK}`,
             boxShadow: SHADOW,
@@ -169,12 +133,12 @@ function Podium() {
             alignItems: 'center',
             justifyContent: 'center',
             boxSizing: 'border-box',
-            padding: '0 12px',
+            padding: '0 8px',
           }}>
             <span style={{
               fontFamily: "'Space Grotesk', sans-serif",
               fontWeight: 700,
-              fontSize: 'clamp(20px, 2.8vw, 40px)',
+              fontSize: isMobile ? 'clamp(10px, 3vw, 16px)' : 'clamp(20px, 2.8vw, 40px)',
               textTransform: 'uppercase',
               color: p.green ? SUPERWHITE : DARK,
               textAlign: 'center',
@@ -187,7 +151,7 @@ function Podium() {
           </div>
 
           {/* Place badge */}
-          <AvatarBadge place={p.place} green={p.green} />
+          <AvatarBadge place={p.place} green={p.green} isMobile={isMobile} />
         </motion.div>
       ))}
     </div>
@@ -195,16 +159,9 @@ function Podium() {
 }
 
 // ─── Ranking table ─────────────────────────────────────────────────────────────
-// Figma column x-positions (within 1384px table, 32px side padding):
-//   Rank:   x=32,    w=95px
-//   Name:   x=143,   w=652px  (avatar 40×40 + 16px gap + name text)
-//   Trees:  x=811,   w=318px
-//   Streak: x=1145,  w=207px  (right-aligned)
-//
-// CSS grid: '95px 1fr 220px 160px' + padding 0 32px reproduces these positions
-const COL_GRID = '95px 1fr 220px 160px';
+function RankingTable({ isMobile }: { isMobile: boolean }) {
+  const COL_GRID = isMobile ? '40px 1fr 80px' : '95px 1fr 220px 160px';
 
-function RankingTable() {
   return (
     <div style={{
       background: SUPERWHITE,
@@ -214,56 +171,77 @@ function RankingTable() {
       overflow: 'hidden',
     }}>
 
-      {/* Header row — h=63px, style_CTWW63: SG 700, 10px, UPPER, 10% ls */}
+      {/* Header row */}
       <div style={{
         display: 'grid',
         gridTemplateColumns: COL_GRID,
         alignItems: 'center',
-        padding: '0 32px',
-        height: 63,
+        padding: isMobile ? '0 16px' : '0 32px',
+        height: isMobile ? 48 : 63,
         borderBottom: '1px solid rgba(26,26,26,0.12)',
         boxSizing: 'border-box',
       }}>
-        {(['Rank', 'Name', 'Trees Completed', 'Current Streak'] as const).map((label, idx) => (
-          <span key={label} style={{
+        <span style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontWeight: 700,
+          fontSize: isMobile ? 8 : 10,
+          textTransform: 'uppercase',
+          letterSpacing: '0.1em',
+          color: DARK,
+          textAlign: 'left',
+        }}>Rank</span>
+        <span style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontWeight: 700,
+          fontSize: isMobile ? 8 : 10,
+          textTransform: 'uppercase',
+          letterSpacing: '0.1em',
+          color: DARK,
+          textAlign: 'left',
+        }}>Name</span>
+        <span style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontWeight: 700,
+          fontSize: isMobile ? 8 : 10,
+          textTransform: 'uppercase',
+          letterSpacing: '0.1em',
+          color: DARK,
+          textAlign: 'center',
+        }}>{isMobile ? 'Trees' : 'Trees Completed'}</span>
+        {!isMobile && (
+          <span style={{
             fontFamily: "'Space Grotesk', sans-serif",
             fontWeight: 700,
             fontSize: 10,
             textTransform: 'uppercase',
             letterSpacing: '0.1em',
             color: DARK,
-            // Streak header is right-aligned (style_M2M75E)
-            textAlign: idx === 3 ? 'right' : 'left',
-          }}>
-            {label}
-          </span>
-        ))}
+            textAlign: 'right',
+          }}>Current Streak</span>
+        )}
       </div>
 
       {/* Data rows */}
       {ROWS.map((row, i) => (
-        <RankRow
-          key={row.rank}
-          row={row}
-          index={i}
-          isLast={i === ROWS.length - 1}
-        />
+        <RankRow key={row.rank} row={row} index={i} isLast={i === ROWS.length - 1} isMobile={isMobile} />
       ))}
 
-      {/* Show more — layout_VQALLZ: center, padding 32px 0 */}
-      <ShowMoreRow />
+      {/* Show more */}
+      <ShowMoreRow isMobile={isMobile} />
     </div>
   );
 }
 
 function RankRow({
-  row, index, isLast,
+  row, index, isLast, isMobile,
 }: {
   row: typeof ROWS[0];
   index: number;
   isLast: boolean;
+  isMobile: boolean;
 }) {
   const me = row.isMe;
+  const COL_GRID = isMobile ? '40px 1fr 80px' : '95px 1fr 220px 160px';
 
   return (
     <motion.div
@@ -274,25 +252,20 @@ function RankRow({
         display: 'grid',
         gridTemplateColumns: COL_GRID,
         alignItems: 'center',
-        // Figma: normal rows padding 20px 32px, highlighted row padding 24px 32px
-        padding: me ? '24px 32px' : '20px 32px',
+        padding: me ? (isMobile ? '16px' : '24px 32px') : (isMobile ? '12px 16px' : '20px 32px'),
         boxSizing: 'border-box',
         background: me ? GREEN : 'transparent',
-        // Figma: highlighted row has 2px green stroke on top+bottom
-        borderTop:    me ? `2px solid ${GREEN}` : 'none',
-        borderBottom: me
-          ? `2px solid ${GREEN}`
-          : isLast ? 'none' : '1px solid rgba(26,26,26,0.1)',
+        borderTop: me ? `2px solid ${GREEN}` : 'none',
+        borderBottom: me ? `2px solid ${GREEN}` : isLast ? 'none' : '1px solid rgba(26,26,26,0.1)',
         boxShadow: me ? '0px 4px 12px 0px rgba(46, 204, 113, 0.15)' : 'none',
       }}
     >
-      {/* Rank — style_IRPU2R (normal): SG 900, 20px / style_5TBYI5 (me): SG 700, 24px
-          opacity 0.2 for non-highlighted (layout_QC53IF opacity=0.2) */}
+      {/* Rank */}
       <div style={{ opacity: me ? 1 : 0.2 }}>
         <span style={{
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: me ? 700 : 900,
-          fontSize: me ? 24 : 20,
+          fontSize: me ? (isMobile ? 18 : 24) : (isMobile ? 14 : 20),
           color: me ? SUPERWHITE : DARK,
           lineHeight: me ? 1.333 : 1.4,
           display: 'block',
@@ -301,23 +274,20 @@ function RankRow({
         </span>
       </div>
 
-      {/* Name: avatar square + name text */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
-        {/* Avatar — layout_SNO9J4: 40×40 radius 12px stroke 1px
-                    layout_5M5TPZ (me): 48×48 radius 12px stroke 2px */}
+      {/* Name */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16 }}>
         <div style={{
-          width:  me ? 48 : 40,
-          height: me ? 48 : 40,
-          borderRadius: 12,
+          width: me ? (isMobile ? 32 : 48) : (isMobile ? 28 : 40),
+          height: me ? (isMobile ? 32 : 48) : (isMobile ? 28 : 40),
+          borderRadius: isMobile ? 8 : 12,
           border: me ? `2px solid ${SUPERWHITE}` : `1px solid ${DARK}`,
           background: me ? 'rgba(255,255,255,0.12)' : 'transparent',
           flexShrink: 0,
         }} />
-        {/* style_OMW1GL: SG 700, 16px, −2.5% ls | style_C7PVWG (me): SG 700, 18px */}
         <span style={{
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: 700,
-          fontSize: me ? 18 : 16,
+          fontSize: me ? (isMobile ? 14 : 18) : (isMobile ? 12 : 16),
           letterSpacing: '-0.025em',
           lineHeight: 1.5,
           color: me ? SUPERWHITE : DARK,
@@ -326,13 +296,12 @@ function RankRow({
         </span>
       </div>
 
-      {/* Trees — style_9M3XXP: SG 500, 12px, UPPER, 10% ls (opacity 0.8)
-                 style_QRZEVA (me): SG 700, 12px, UPPER, 10% ls */}
-      <div style={{ opacity: me ? 1 : 0.8 }}>
+      {/* Trees */}
+      <div style={{ opacity: me ? 1 : 0.8, textAlign: 'center' }}>
         <span style={{
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: me ? 700 : 500,
-          fontSize: 12,
+          fontSize: isMobile ? 10 : 12,
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
           color: me ? SUPERWHITE : DARK,
@@ -342,54 +311,51 @@ function RankRow({
         </span>
       </div>
 
-      {/* Streak + flame — layout_B8KPDU: row, flex-end, gap 5.99px */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'flex-end',
-        gap: 6,
-      }}>
-        {/* style_PZBRS6: SG 900, 16px, right-aligned | style_K7A7JM (me): SG 700, 20px */}
-        <span style={{
-          fontFamily: "'Space Grotesk', sans-serif",
-          fontWeight: me ? 700 : 900,
-          fontSize: me ? 20 : 16,
-          color: me ? SUPERWHITE : GREEN,
-          lineHeight: 1.5,
-          textAlign: 'right',
+      {/* Streak (desktop only) */}
+      {!isMobile && (
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'flex-end',
+          gap: 6,
         }}>
-          {row.streak}
-        </span>
-        {/* Flame SVG */}
-        <svg width="11" height="16" viewBox="0 0 11 16" fill="none">
-          <path
-            d="M5.5 0C5.5 0 9.5 3.8 9.5 7.5C9.5 9.8 7.6 11.5 5.5 11.5C3.4 11.5 1.5 9.8 1.5 7.5C1.5 6.7 1.9 5.4 1.9 5.4C1.9 5.4 2.8 7 3.8 7C3.8 4.4 5.5 2.6 5.5 0Z"
-            fill={me ? SUPERWHITE : GREEN}
-          />
-          <path
-            d="M5.5 9C5.5 9 7 10 7 11.3C7 12.55 6.38 13.5 5.5 13.5C4.62 13.5 4 12.55 4 11.3C4 10 5.5 9 5.5 9Z"
-            fill={me ? 'rgba(250,250,250,0.5)' : 'rgba(0,109,55,0.45)'}
-          />
-        </svg>
-      </div>
+          <span style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: me ? 700 : 900,
+            fontSize: me ? 20 : 16,
+            color: me ? SUPERWHITE : GREEN,
+            lineHeight: 1.5,
+            textAlign: 'right',
+          }}>
+            {row.streak}
+          </span>
+          <svg width="11" height="16" viewBox="0 0 11 16" fill="none">
+            <path
+              d="M5.5 0C5.5 0 9.5 3.8 9.5 7.5C9.5 9.8 7.6 11.5 5.5 11.5C3.4 11.5 1.5 9.8 1.5 7.5C1.5 6.7 1.9 5.4 1.9 5.4C1.9 5.4 2.8 7 3.8 7C3.8 4.4 5.5 2.6 5.5 0Z"
+              fill={me ? SUPERWHITE : GREEN}
+            />
+            <path
+              d="M5.5 9C5.5 9 7 10 7 11.3C7 12.55 6.38 13.5 5.5 13.5C4.62 13.5 4 12.55 4 11.3C4 10 5.5 9 5.5 9Z"
+              fill={me ? 'rgba(250,250,250,0.5)' : 'rgba(0,109,55,0.45)'}
+            />
+          </svg>
+        </div>
+      )}
     </motion.div>
   );
 }
 
-function ShowMoreRow() {
+function ShowMoreRow({ isMobile }: { isMobile: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <div
       onClick={() => setOpen(v => !v)}
-      onMouseEnter={e => ((e.currentTarget as HTMLDivElement).style.opacity = '0.65')}
-      onMouseLeave={e => ((e.currentTarget as HTMLDivElement).style.opacity = '0.4')}
       style={{
         display: 'flex',
         justifyContent: 'center',
         alignItems: 'center',
         gap: 8,
-        // layout_VQALLZ: padding 32px 0
-        padding: '32px 0',
+        padding: isMobile ? '20px 0' : '32px 0',
         borderTop: '1px solid rgba(26,26,26,0.08)',
         cursor: 'pointer',
         opacity: 0.4,
@@ -397,11 +363,10 @@ function ShowMoreRow() {
         userSelect: 'none',
       }}
     >
-      {/* style_7KB821: SG 700, 10px, UPPER, 20% ls */}
       <span style={{
         fontFamily: "'Space Grotesk', sans-serif",
         fontWeight: 700,
-        fontSize: 10,
+        fontSize: isMobile ? 9 : 10,
         textTransform: 'uppercase',
         letterSpacing: '0.2em',
         color: DARK,
@@ -420,18 +385,18 @@ function ShowMoreRow() {
 
 // ─── Category toggle ───────────────────────────────────────────────────────────
 function CategoryToggle({
-  active, onChange,
+  active, onChange, isMobile,
 }: {
   active: 'solo' | 'groups';
   onChange: (v: 'solo' | 'groups') => void;
+  isMobile: boolean;
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 20 }}>
-      {/* "CATEGORY" label — style_0631J8: SG 700, 16px, UPPER, 7.5% ls */}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isMobile ? 12 : 20 }}>
       <span style={{
         fontFamily: "'Space Grotesk', sans-serif",
         fontWeight: 700,
-        fontSize: 16,
+        fontSize: isMobile ? 14 : 16,
         textTransform: 'uppercase',
         letterSpacing: '0.075em',
         color: DARK,
@@ -439,7 +404,6 @@ function CategoryToggle({
         Category
       </span>
 
-      {/* Toggle pill — w=245, h=56, 1px border, 4px radius, padding 4px */}
       <div style={{
         display: 'flex',
         alignItems: 'stretch',
@@ -447,8 +411,8 @@ function CategoryToggle({
         border: `1px solid ${DARK}`,
         borderRadius: 4,
         padding: 4,
-        width: 245,
-        height: 56,
+        width: isMobile ? 200 : 245,
+        height: isMobile ? 48 : 56,
         boxSizing: 'border-box',
         gap: 4,
       }}>
@@ -467,11 +431,10 @@ function CategoryToggle({
               opacity: active === tab ? 1 : 0.5,
             }}
           >
-            {/* style_I14GO6: SG 700, 14px, 2.5% ls */}
             <span style={{
               fontFamily: "'Space Grotesk', sans-serif",
               fontWeight: 700,
-              fontSize: 14,
+              fontSize: isMobile ? 12 : 14,
               letterSpacing: '0.025em',
               color: active === tab ? SUPERWHITE : DARK,
             }}>
@@ -487,61 +450,85 @@ function CategoryToggle({
 // ─── Page ──────────────────────────────────────────────────────────────────────
 export default function LeaderboardPage() {
   const [category, setCategory] = useState<'solo' | 'groups'>('solo');
+  const isMobile = useIsMobile();
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: BG }}>
-      <Sidebar activePage="leaderboard" />
+      {!isMobile && <Sidebar activePage="leaderboard" />}
 
       <main style={{
-        marginLeft: 101,      // sidebar width
+        marginLeft: isMobile ? 0 : 101,
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
         minHeight: '100vh',
         boxSizing: 'border-box',
+        paddingBottom: isMobile ? 100 : 0,
       }}>
 
-        {/* ── Category toggle — centred, paddingTop=60px (Figma y≈60) ── */}
+        {/* Mobile Header */}
+        {isMobile && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            padding: '20px 16px 0',
+          }}>
+            <h1 style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700,
+              fontSize: '20px',
+              color: DARK,
+              margin: 0,
+            }}>
+              Leaderboard
+            </h1>
+          </div>
+        )}
+
+        {/* Category toggle */}
         <div style={{
           display: 'flex',
           justifyContent: 'center',
-          paddingTop: 60,
-          paddingBottom: 48,
+          paddingTop: isMobile ? 24 : 60,
+          paddingBottom: isMobile ? 24 : 48,
         }}>
-          <CategoryToggle active={category} onChange={setCategory} />
+          <CategoryToggle active={category} onChange={setCategory} isMobile={isMobile} />
         </div>
 
-        {/* ── Podium — 6.5% horizontal padding (= 106px at 1627px canvas) ── */}
+        {/* Podium */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
           style={{
-            paddingLeft: '6.5%',
-            paddingRight: '6.5%',
+            paddingLeft: isMobile ? '16px' : '6.5%',
+            paddingRight: isMobile ? '16px' : '6.5%',
           }}
         >
-          <Podium />
+          <Podium isMobile={isMobile} />
         </motion.div>
 
-        {/* Gap: podium bottom → table top ≈ 88px (y=718 − (y=242+h=388) = 88) */}
-        <div style={{ height: 88 }} />
+        {/* Gap */}
+        <div style={{ height: isMobile ? 32 : 88 }} />
 
-        {/* ── Ranking table — 7.5% horizontal padding (= 122px at 1627px canvas) ── */}
+        {/* Ranking table */}
         <motion.div
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2, duration: 0.4 }}
           style={{
-            paddingLeft: '7.5%',
-            paddingRight: '7.5%',
+            paddingLeft: isMobile ? '16px' : '7.5%',
+            paddingRight: isMobile ? '16px' : '7.5%',
           }}
         >
-          <RankingTable />
+          <RankingTable isMobile={isMobile} />
         </motion.div>
 
-        <div style={{ height: 60 }} />
+        <div style={{ height: isMobile ? 24 : 60 }} />
       </main>
+
+      {isMobile && <MobileBottomNav activePage="leaderboard" />}
     </div>
   );
 }

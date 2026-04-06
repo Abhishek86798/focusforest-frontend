@@ -165,28 +165,18 @@ export default function MobileBottomNav({
               aria-label={item.label}
               onClick={() => navigate(item.path)}
               style={{
-                background:   'none',
+                background:   isActive ? GREEN : 'none',
                 border:       'none',
-                padding:      0,
+                padding:      isActive ? '7.7px' : 0,
                 cursor:       'pointer',
                 display:      'flex',
                 alignItems:   'center',
                 justifyContent: 'center',
                 flexShrink:   0,
-                /* Active background: layout_ASLV7Q padding=7.69px, h=38.46, Green fill */
-                ...(isActive
-                  ? {
-                      background:   GREEN,
-                      borderRadius: 8,
-                      padding:      '7.7px',
-                      width:        38,
-                      height:       38,
-                    }
-                  : {
-                      opacity: 0.5,
-                      width:   38,
-                      height:  38,
-                    }),
+                borderRadius: isActive ? 8 : 0,
+                width:        38,
+                height:       38,
+                opacity:      isActive ? 1 : 0.5,
                 transition: 'opacity 0.15s, background 0.15s',
               }}
               onMouseEnter={e => {

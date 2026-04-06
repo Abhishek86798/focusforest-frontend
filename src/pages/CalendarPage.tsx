@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import Sidebar from '../components/Sidebar';
+import MobileBottomNav from '../components/MobileBottomNav';
+import { useIsMobile } from '../hooks/useIsMobile';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const DARK = '#1A1A1A';
@@ -12,10 +14,6 @@ const SHADOW = `4px 4px 0px 0px ${DARK}`;
 const MUTED = '#3D4A3E';
 
 // ─── Heatmap data generation ────────────────────────────────────────────────────
-// Rows: MON, TUE, FRI shown  (3 visible rows in design)
-// Cols: ~52 weeks × 7 days = 364 cells per row, but we show only Mon/Tue/Fri
-// Simplify: generate a realistic-looking heatmap with varying density
-
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
 const WEEKS = 53;
 
@@ -24,11 +22,9 @@ function seededRandom(seed: number) {
   return x - Math.floor(x);
 }
 
-// Generate a cell: 0 = empty, 1-4 = intensity (darker green)
 function generateHeatmapRow(rowIdx: number): number[] {
   return Array.from({ length: WEEKS }, (_, w) => {
     const r = seededRandom(rowIdx * 1000 + w * 7);
-    // Make it realistic: denser in some months, sparse in others
     const monthInfluence = Math.sin((w / WEEKS) * Math.PI * 2.5) * 0.3 + 0.7;
     if (r > 0.35 * monthInfluence) {
       const intensity = Math.ceil(seededRandom(rowIdx * 500 + w) * 4);
@@ -47,32 +43,32 @@ function cellColor(value: number): string {
 }
 
 // ─── Focus Grid Component ───────────────────────────────────────────────────────
-function FocusGrid({ year }: { year: number }) {
+function FocusGrid({ year, isMobile }: { year: number; isMobile: boolean }) {
   return (
     <div
       style={{
         background: SUPER_WHITE,
         border: `2px solid ${DARK}`,
         boxShadow: SHADOW,
-        padding: '32px 32px 28px',
+        padding: isMobile ? '20px 16px' : '32px 32px 28px',
         position: 'relative',
+        overflowX: 'auto',
       }}
     >
       {/* Title row */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
-        <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '24px', color: DARK }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: isMobile ? '16px' : '20px' }}>
+        <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? '18px' : '24px', color: DARK }}>
           Focus Grid
         </span>
-        <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: '20px', color: DARK }}>
+        <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? '16px' : '20px', color: DARK }}>
           {year}
         </span>
       </div>
 
-      <div style={{ display: 'flex', gap: '0' }}>
+      <div style={{ display: 'flex', gap: '0', minWidth: isMobile ? '600px' : 'auto' }}>
         {/* Day labels column */}
         <div style={{ display: 'flex', flexDirection: 'column', paddingTop: '20px', paddingRight: '10px', gap: '3px' }}>
           {Array.from({ length: 7 }).map((_, i) => {
-            // Suppose row 0=SUN, 1=MON, 2=TUE, 3=WED, 4=THU, 5=FRI, 6=SAT
             let dayLabel = '';
             if (i === 1) dayLabel = 'MON';
             if (i === 2) dayLabel = 'TUE';
@@ -82,11 +78,11 @@ function FocusGrid({ year }: { year: number }) {
               <span key={i} style={{
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 700,
-                fontSize: '11px',
+                fontSize: isMobile ? '9px' : '11px',
                 textTransform: 'uppercase',
                 color: MUTED,
                 lineHeight: '1',
-                height: '14px',
+                height: isMobile ? '10px' : '14px',
                 display: 'flex',
                 alignItems: 'center',
               }}>
@@ -105,7 +101,7 @@ function FocusGrid({ year }: { year: number }) {
                 <span style={{
                   fontFamily: "'Inter', sans-serif",
                   fontWeight: 700,
-                  fontSize: '11px',
+                  fontSize: isMobile ? '8px' : '11px',
                   textTransform: 'uppercase',
                   color: MUTED,
                 }}>
@@ -116,29 +112,23 @@ function FocusGrid({ year }: { year: number }) {
           </div>
 
           {/* Heatmap rows */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '2px' : '8px' }}>
             {HEATMAP_DATA.map((row, ri) => (
-              <div key={ri} style={{ display: 'flex', gap: '3px' }}>
+              <div key={ri} style={{ display: 'flex', gap: isMobile ? '2px' : '3px' }}>
                 {row.map((val, wi) => (
                   <div
                     key={wi}
                     title={val > 0 ? `${val} session${val > 1 ? 's' : ''}` : 'No sessions'}
                     style={{
-                      width: '14px',
-                      height: '14px',
+                      width: isMobile ? '10px' : '14px',
+                      height: isMobile ? '10px' : '14px',
                       flexShrink: 0,
-                      background: val === 0
-                        ? 'transparent'
-                        : cellColor(val),
-                      border: val === 0
-                        ? `1.5px solid rgba(26,26,26,0.2)`
-                        : 'none',
+                      background: val === 0 ? 'transparent' : cellColor(val),
+                      border: val === 0 ? `1px solid rgba(26,26,26,0.2)` : 'none',
                       borderRadius: '2px',
                       cursor: 'default',
                       transition: 'opacity 0.15s',
                     }}
-                    onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.opacity = '0.75'; }}
-                    onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.opacity = '1'; }}
                   />
                 ))}
               </div>
@@ -151,23 +141,24 @@ function FocusGrid({ year }: { year: number }) {
 }
 
 // ─── Stat Card ──────────────────────────────────────────────────────────────────
-function StatCard({ label, value }: { label: string; value: string }) {
+function StatCard({ label, value, isMobile }: { label: string; value: string; isMobile: boolean }) {
   return (
     <div style={{
       flex: '1 1 0',
       background: WHITE,
       border: `2px solid ${DARK}`,
       boxShadow: SHADOW,
-      padding: '32px',
+      padding: isMobile ? '20px' : '32px',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'space-between',
-      height: '190px',
+      height: isMobile ? '120px' : '190px',
+      minWidth: isMobile ? '140px' : 'auto',
     }}>
       <span style={{
         fontFamily: "'Inter', sans-serif",
         fontWeight: 700,
-        fontSize: '16px',
+        fontSize: isMobile ? '10px' : '16px',
         lineHeight: '1em',
         textTransform: 'uppercase',
         color: MUTED,
@@ -179,7 +170,7 @@ function StatCard({ label, value }: { label: string; value: string }) {
       <span style={{
         fontFamily: "'Space Grotesk', sans-serif",
         fontWeight: 700,
-        fontSize: '60px',
+        fontSize: isMobile ? '32px' : '60px',
         lineHeight: '1em',
         color: DARK2,
         display: 'block',
@@ -199,21 +190,21 @@ const WEEKS_DATA = [
   { label: 'Week 4', summary: 'You completed 18 sessions and help growing 5 trees!!' },
 ];
 
-function MonthlyEfforts() {
+function MonthlyEfforts({ isMobile }: { isMobile: boolean }) {
   return (
     <div style={{
       background: WHITE,
       border: `2px solid ${DARK}`,
       boxShadow: SHADOW,
-      padding: '32px',
+      padding: isMobile ? '20px' : '32px',
       display: 'flex',
       flexDirection: 'column',
-      gap: '24px',
+      gap: isMobile ? '16px' : '24px',
     }}>
       <span style={{
         fontFamily: "'Space Grotesk', sans-serif",
         fontWeight: 700,
-        fontSize: '24px',
+        fontSize: isMobile ? '18px' : '24px',
         textTransform: 'uppercase',
         color: DARK2,
         letterSpacing: '0.04em',
@@ -227,26 +218,25 @@ function MonthlyEfforts() {
             key={i}
             style={{
               display: 'flex',
-              alignItems: 'center',
+              flexDirection: isMobile ? 'column' : 'row',
+              alignItems: isMobile ? 'flex-start' : 'center',
               justifyContent: 'space-between',
-              padding: '16px 16px',
+              padding: isMobile ? '12px' : '16px 16px',
               border: `1px solid ${DARK}`,
               borderBottom: i < WEEKS_DATA.length - 1 ? 'none' : `1px solid ${DARK}`,
               background: WHITE,
-              gap: '16px',
+              gap: isMobile ? '8px' : '16px',
               transition: 'background 0.15s',
             }}
-            onMouseEnter={e => { (e.currentTarget as HTMLDivElement).style.background = '#F8F8F8'; }}
-            onMouseLeave={e => { (e.currentTarget as HTMLDivElement).style.background = WHITE; }}
           >
             {/* Week label */}
             <span style={{
               fontFamily: "'Inter', sans-serif",
               fontWeight: 600,
-              fontSize: '14px',
+              fontSize: isMobile ? '12px' : '14px',
               color: DARK2,
               flexShrink: 0,
-              width: '60px',
+              width: isMobile ? 'auto' : '60px',
             }}>
               {week.label}
             </span>
@@ -255,10 +245,10 @@ function MonthlyEfforts() {
             <span style={{
               fontFamily: "'Inter', sans-serif",
               fontWeight: 400,
-              fontSize: '14px',
+              fontSize: isMobile ? '12px' : '14px',
               color: DARK2,
               flex: 1,
-              textAlign: 'center',
+              textAlign: isMobile ? 'left' : 'center',
             }}>
               {week.summary}
             </span>
@@ -270,24 +260,17 @@ function MonthlyEfforts() {
                 background: GREEN,
                 border: 'none',
                 borderRadius: '2px',
-                padding: '6px 14px',
+                padding: isMobile ? '6px 12px' : '6px 14px',
                 fontFamily: "'Space Grotesk', sans-serif",
                 fontWeight: 700,
-                fontSize: '11px',
+                fontSize: isMobile ? '10px' : '11px',
                 textTransform: 'uppercase',
                 color: SUPER_WHITE,
                 cursor: 'pointer',
                 letterSpacing: '0.05em',
                 boxShadow: '2px 2px 0px rgba(0,0,0,0.3)',
                 transition: 'opacity 0.15s, transform 0.1s',
-              }}
-              onMouseEnter={e => {
-                (e.currentTarget as HTMLButtonElement).style.opacity = '0.85';
-                (e.currentTarget as HTMLButtonElement).style.transform = 'translate(-1px,-1px)';
-              }}
-              onMouseLeave={e => {
-                (e.currentTarget as HTMLButtonElement).style.opacity = '1';
-                (e.currentTarget as HTMLButtonElement).style.transform = 'translate(0,0)';
+                alignSelf: isMobile ? 'flex-end' : 'auto',
               }}
             >
               View
@@ -305,26 +288,47 @@ type Category = 'solo' | 'groups';
 export default function CalendarPage() {
   const [category, setCategory] = useState<Category>('solo');
   const currentYear = new Date().getFullYear();
+  const isMobile = useIsMobile();
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: BG }}>
-      <Sidebar activePage="calendar" />
+      {!isMobile && <Sidebar activePage="calendar" />}
 
       <main style={{
-        marginLeft: '101px',
+        marginLeft: isMobile ? 0 : '101px',
         flex: 1,
-        padding: '73px 110px 80px',
+        padding: isMobile ? '20px 16px 100px' : '73px 110px 80px',
         display: 'flex',
         flexDirection: 'column',
-        gap: '40px',
+        gap: isMobile ? '24px' : '40px',
       }}>
+
+        {/* Mobile Header */}
+        {isMobile && (
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingBottom: '8px',
+          }}>
+            <h1 style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700,
+              fontSize: '20px',
+              color: DARK,
+              margin: 0,
+            }}>
+              Calendar
+            </h1>
+          </div>
+        )}
 
         {/* ── Category toggle ── */}
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '10px' }}>
           <span style={{
             fontFamily: "'Space Grotesk', sans-serif",
             fontWeight: 700,
-            fontSize: '14px',
+            fontSize: isMobile ? '12px' : '14px',
             textTransform: 'uppercase',
             letterSpacing: '0.08em',
             color: DARK,
@@ -341,10 +345,10 @@ export default function CalendarPage() {
                 key={cat}
                 onClick={() => setCategory(cat)}
                 style={{
-                  padding: '8px 32px',
+                  padding: isMobile ? '8px 24px' : '8px 32px',
                   fontFamily: "'Space Grotesk', sans-serif",
                   fontWeight: 700,
-                  fontSize: '14px',
+                  fontSize: isMobile ? '12px' : '14px',
                   textTransform: 'capitalize',
                   border: 'none',
                   cursor: 'pointer',
@@ -362,19 +366,25 @@ export default function CalendarPage() {
         </div>
 
         {/* ── Focus Grid (GitHub-style heatmap) ── */}
-        <FocusGrid year={currentYear} />
+        <FocusGrid year={currentYear} isMobile={isMobile} />
 
         {/* ── Yearly stat cards ── */}
-        <div style={{ display: 'flex', gap: '29px' }}>
-          <StatCard label="Total Minutes" value="14000" />
-          <StatCard label="Trees Completed" value="284" />
-          <StatCard label="Task Completion" value="74%" />
-          <StatCard label="Sessions" value="700" />
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
+          gap: isMobile ? '12px' : '29px',
+        }}>
+          <StatCard label="Total Minutes" value="14000" isMobile={isMobile} />
+          <StatCard label="Trees Completed" value="284" isMobile={isMobile} />
+          <StatCard label="Task Completion" value="74%" isMobile={isMobile} />
+          <StatCard label="Sessions" value="700" isMobile={isMobile} />
         </div>
 
         {/* ── Monthly Efforts ── */}
-        <MonthlyEfforts />
+        <MonthlyEfforts isMobile={isMobile} />
       </main>
+
+      {isMobile && <MobileBottomNav activePage="calendar" />}
     </div>
   );
 }
