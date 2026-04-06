@@ -1,4 +1,7 @@
 .agent
 .agents
 node_modules
-.env
+.env-e 
+# Environment files
+*.env
+*.env.*
