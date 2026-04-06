@@ -1,5 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
+import MobileBottomNav from '../components/MobileBottomNav';
+import { useIsMobile } from '../hooks/useIsMobile';
 import { useAuthStore } from '../stores/authStore';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { sessionApi } from '../api';
@@ -30,6 +33,29 @@ const FOCUS_SIZE = 553.31;
 const FOCUS_STROKE = 7.685;
 const FOCUS_RADIUS = FOCUS_SIZE / 2 - FOCUS_STROKE / 2;
 const FOCUS_CIRC = 2 * Math.PI * FOCUS_RADIUS;
+
+// ─── Mobile Timer (Figma 192:17 — 288×288, stroke 4px) ────────────────────
+
+const MOB_SIZE   = 288;
+const MOB_STROKE = 4;
+const MOB_RADIUS = MOB_SIZE / 2 - MOB_STROKE / 2;  // 142
+const MOB_CIRC   = 2 * Math.PI * MOB_RADIUS;        // ≈ 892.35
+
+// ─── Mobile Focus Timer (Figma 192:233 — 308.22×308.22, stroke 4.28px) ───────
+
+const MOB_FOCUS_SIZE   = 308.22;
+const MOB_FOCUS_STROKE = 4.28;
+const MOB_FOCUS_RADIUS = MOB_FOCUS_SIZE / 2 - MOB_FOCUS_STROKE / 2;  // ≈ 151.97
+const MOB_FOCUS_CIRC   = 2 * Math.PI * MOB_FOCUS_RADIUS;              // ≈ 954.9
+
+// ─── Mobile ProfileIcon (Figma 192:33 — 28×28) ────────────────────────────
+const MobileProfileIcon = ({ color = '#1A1A1A' }: { color?: string }) => (
+  <svg width="28" height="28" viewBox="0 0 32 32" fill="none">
+    <path d="M16 18.2857C19.1559 18.2857 21.7143 15.7274 21.7143 12.5715C21.7143 9.41555 19.1559 6.85718 16 6.85718C12.8441 6.85718 10.2857 9.41555 10.2857 12.5715C10.2857 15.7274 12.8441 18.2857 16 18.2857Z" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M6.24 27.2C7.26 25.53 8.69 24.14 10.40 23.18C12.11 22.22 14.04 21.72 16 21.72C17.96 21.72 19.89 22.22 21.60 23.18C23.31 24.14 24.74 25.53 25.76 27.2" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+    <path d="M16 30.86C24.21 30.86 30.86 24.21 30.86 16C30.86 7.79 24.21 1.14 16 1.14C7.79 1.14 1.14 7.79 1.14 16C1.14 24.21 7.79 30.86 16 30.86Z" stroke={color} strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
@@ -75,10 +101,12 @@ function SessionPopup({ task, onAction }: { task: string; onAction: (status: 'co
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const user = useAuthStore(s => s.user);
   const currentStreak = user?.currentStreak || 0;
   const queryClient = useQueryClient();
 
+  const isMobile = useIsMobile();
   const { selectedVariant, customFocusMinutes, alwaysUseVariant } = useSessionStore();
   const customBreakMinutes = useSessionStore(s => (s as any).customBreakMinutes || 5);
 
@@ -214,6 +242,333 @@ export default function DashboardPage() {
   const focusProgress = timeLeft / modeSeconds;
   const focusDashOffset = FOCUS_CIRC * (1 - focusProgress);
 
+  // ── MOBILE Focus Mode (Figma 192:233) ─────────────────────────────────────
+  if (isMobile && (focusMode || (timeLeft < modeSeconds && timeLeft > 0))) {
+    const mobFocusProgress   = timeLeft / modeSeconds;
+    const mobFocusDashOffset = MOB_FOCUS_CIRC * (1 - mobFocusProgress);
+
+    return (
+      <div
+        style={{
+          /* Figma 192:233: 402×874, White (#F2F2F2) */
+          height:        '100dvh',
+          background:    '#F2F2F2',
+          display:       'flex',
+          flexDirection: 'column',
+          overflow:      'hidden',
+          position:      'relative',
+        }}
+      >
+        {/*
+          Body (layout_60JUV4):
+            x=35, y=48, w=332, h=778
+            column, justifyContent=space-between, alignItems=center, gap=38
+          4 children: Task chip | Image | Timer | ABANDON SESSION
+        */}
+        <main
+          style={{
+            flex:           1,
+            padding:        '48px 35px 40px',
+            display:        'flex',
+            flexDirection:  'column',
+            alignItems:     'center',
+            justifyContent: 'space-between',
+            boxSizing:      'border-box',
+            overflowY:      'auto',
+          }}
+        >
+          {/* ── Task chip (layout_0G1W7U): 156×32.96 ──
+                Shadow: 3.66px offset, Black
+                Button: 152.34×29.3, Green, radius=5
+                Text: SG 700, 10.25px, UPPER, 5% ls
+          ── */}
+          {task ? (
+            <div style={{ position: 'relative', width: 156, height: 32.96, flexShrink: 0 }}>
+              {/* Shadow (layout_XT95IJ): offset 3.66px */}
+              <div
+                style={{
+                  position:     'absolute',
+                  left:         3.66,
+                  top:          3.66,
+                  width:        152.34,
+                  height:       29.3,
+                  background:   '#1A1A1A',
+                  borderRadius: 5,
+                }}
+              />
+              {/* Green chip (layout_SGXTD1) */}
+              <div
+                style={{
+                  position:       'absolute',
+                  left:           0,
+                  top:            0,
+                  width:          152.34,
+                  height:         29.3,
+                  background:     '#006D37',
+                  borderRadius:   5,
+                  display:        'flex',
+                  alignItems:     'center',
+                  justifyContent: 'center',
+                  overflow:       'hidden',
+                }}
+              >
+                <span
+                  style={{
+                    fontFamily:    "'Space Grotesk', sans-serif",
+                    fontWeight:    700,
+                    fontSize:      10.25,
+                    letterSpacing: '5%',
+                    textTransform: 'uppercase',
+                    color:         '#FAFAFA',
+                    whiteSpace:    'nowrap',
+                    overflow:      'hidden',
+                    textOverflow:  'ellipsis',
+                    maxWidth:      '100%',
+                    padding:       '0 8px',
+                  }}
+                >
+                  {task}
+                </span>
+              </div>
+            </div>
+          ) : (
+            /* Placeholder spacer so space-between still works without a task */
+            <div style={{ width: 156, height: 32.96, flexShrink: 0 }} />
+          )}
+
+          {/* ── Forest image (layout_NQ8IOS): w=fill, h=228 ── */}
+          <div
+            style={{
+              width:        '100%',
+              height:       228,
+              borderRadius: 12,
+              overflow:     'hidden',
+              flexShrink:   0,
+            }}
+          >
+            <img
+              src="/images/tree_hero.png"
+              alt="Focus Forest"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </div>
+
+          {/* ── Timer circle (layout_B4VH97): 308.22×308.22 ──
+                Absolute positions (Figma px):
+                  Time    : x=58.33,  y=53.42,  w=191.21, h=87   — SG 700, 68.49px
+                  Focus btn: x=101.85, y=160.42, w=103.45, h=38.53 — shadow 2.85px
+                  Dots     : x=122.8,  y=221.66, row gap=9.82, dot=7.37×7.37
+                  Label    : x=116.22, y=251.75, w=77, h=12        — Inter 700, 9.99px
+          ── */}
+          <div
+            style={{
+              width:      MOB_FOCUS_SIZE,
+              height:     MOB_FOCUS_SIZE,
+              position:   'relative',
+              flexShrink: 0,
+            }}
+          >
+            {/* SVG arcs */}
+            <svg
+              viewBox={`0 0 ${MOB_FOCUS_SIZE} ${MOB_FOCUS_SIZE}`}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+            >
+              {/* Track — Faded white #E8E8E8 */}
+              <circle
+                cx={MOB_FOCUS_SIZE / 2} cy={MOB_FOCUS_SIZE / 2} r={MOB_FOCUS_RADIUS}
+                fill="none" stroke="#E8E8E8" strokeWidth={MOB_FOCUS_STROKE}
+              />
+              {/* Progress arc — Green */}
+              <circle
+                cx={MOB_FOCUS_SIZE / 2} cy={MOB_FOCUS_SIZE / 2} r={MOB_FOCUS_RADIUS}
+                fill="none" stroke={ringColor} strokeWidth={MOB_FOCUS_STROKE}
+                strokeDasharray={MOB_FOCUS_CIRC}
+                strokeDashoffset={mobFocusDashOffset}
+                strokeLinecap="round"
+                transform={`rotate(-90 ${MOB_FOCUS_SIZE / 2} ${MOB_FOCUS_SIZE / 2})`}
+                style={{ transition: 'stroke-dashoffset 0.5s linear' }}
+              />
+            </svg>
+
+            {/* Time — layout_4CEUQI: x=58.33, y=53.42, w=191.21, h=87
+                style_R7MZXL: SG 700, 68.49px */}
+            <span
+              style={{
+                position:       'absolute',
+                left:           58.33,
+                top:            53.42,
+                width:          191.21,
+                height:         87,
+                display:        'flex',
+                alignItems:     'center',
+                justifyContent: 'center',
+                fontFamily:     "'Space Grotesk', sans-serif",
+                fontWeight:     700,
+                fontSize:       68.49,
+                lineHeight:     1.276,
+                color:          '#1A1A1A',
+                letterSpacing:  '-2px',
+                whiteSpace:     'nowrap',
+              }}
+            >
+              {formatTime(timeLeft)}
+            </span>
+
+            {/* Focus / Resume button — layout_IZFBRJ: x=101.85, y=160.42, w=103.45, h=38.53
+                Shadow (layout_N1HCBC): 2.85px offset
+                Button (layout_9M8E53): 100.6×35.67, Green, radius=6
+                Text (style_TWWLSJ): Inter 700, 17.12px */}
+            <div
+              style={{
+                position: 'absolute',
+                left:     101.85,
+                top:      160.42,
+                width:    103.45,
+                height:   38.53,
+              }}
+            >
+              {/* Shadow */}
+              <div
+                style={{
+                  position:     'absolute',
+                  left:         2.85,
+                  top:          2.85,
+                  width:        100.6,
+                  height:       35.67,
+                  background:   '#1A1A1A',
+                  borderRadius: 6,
+                }}
+              />
+              <button
+                onClick={() => setRunning(r => !r)}
+                style={{
+                  position:     'absolute',
+                  left:         0,
+                  top:          0,
+                  width:        100.6,
+                  height:       35.67,
+                  background:   '#006D37',
+                  border:       'none',
+                  borderRadius: 6,
+                  cursor:       'pointer',
+                  fontFamily:   "'Inter', sans-serif",
+                  fontWeight:   700,
+                  fontSize:     17.12,
+                  color:        '#FAFAFA',
+                  transition:   'transform 0.1s',
+                }}
+                onMouseDown={e  => (e.currentTarget.style.transform = 'translate(2.85px,2.85px)')}
+                onMouseUp={e    => (e.currentTarget.style.transform = 'none')}
+                onMouseLeave={e => (e.currentTarget.style.transform = 'none')}
+                onTouchStart={e  => ((e.currentTarget as HTMLButtonElement).style.transform = 'translate(2.85px,2.85px)')}
+                onTouchEnd={e    => ((e.currentTarget as HTMLButtonElement).style.transform = 'none')}
+              >
+                {running ? 'Focus' : 'Resume'}
+              </button>
+            </div>
+
+            {/* Progress dots — layout_I5TQQX: x=122.8, y=221.66, row, gap=9.82px
+                Each dot (layout_SSG4P3): 7.37×7.37
+                effect_AXFW74: active ring rgba(0,109,55,0.2) spread=2.46px */}
+            <div
+              style={{
+                position:      'absolute',
+                left:          122.8,
+                top:           221.66,
+                display:       'flex',
+                flexDirection: 'row',
+                gap:           9.82,
+                alignItems:    'center',
+              }}
+            >
+              {Array.from({ length: TOTAL_SESSIONS }).map((_, i) => {
+                const done   = i < completedSessions;
+                const active = i === completedSessions;
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      width:        7.37,
+                      height:       7.37,
+                      borderRadius: '50%',
+                      background:   done ? '#006D37' : 'transparent',
+                      border:       `1.8px solid ${done ? '#006D37' : active ? '#006D37' : '#C4C4C4'}`,
+                      /* effect_AXFW74: boxShadow spread 2.46px green glow */
+                      boxShadow:    active ? '0 0 0 2.46px rgba(0,109,55,0.2)' : 'none',
+                      transition:   'all 0.3s ease',
+                    }}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Mode label — layout_X0J3A8: x=116.22, y=251.75, w=77, h=12
+                style_ZABD48: Inter 700, 9.99px */}
+            <span
+              style={{
+                position:   'absolute',
+                left:       116.22,
+                top:        251.75,
+                width:      77,
+                height:     12,
+                textAlign:  'center',
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 700,
+                fontSize:   9.99,
+                lineHeight: 1.21,
+                color:      '#1A1A1A',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {modeLabel}
+            </span>
+          </div>
+
+          {/* ── ABANDON SESSION (layout_SRJC3X / WYVTUX)
+                w=208 (fill), h=30.81
+                style_Y7CQBV: SG 700, 10.27px, UPPER, ls=23.37%
+          ── */}
+          <button
+            onClick={handleAbandon}
+            style={{
+              width:          208,
+              height:         30.81,
+              flexShrink:     0,
+              background:     'none',
+              border:         'none',
+              cursor:         'pointer',
+              fontFamily:     "'Space Grotesk', sans-serif",
+              fontWeight:     700,
+              fontSize:       10.27,
+              lineHeight:     1.558,
+              letterSpacing:  '0.24em',
+              textTransform:  'uppercase',
+              textDecoration: 'underline',
+              textUnderlineOffset: '3px',
+              color:          '#1A1A1A',
+              transition:     'opacity 0.2s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.opacity = '0.5')}
+            onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+          >
+            Abandon Session
+          </button>
+        </main>
+
+        {showSessionPopup && <SessionPopup task={task} onAction={handlePopupComplete} />}
+
+        <VariantPickerModal
+          isOpen={showVariantPicker}
+          onClose={() => setShowVariantPicker(false)}
+          onContinue={() => {
+            setShowVariantPicker(false);
+            setRunning(true);
+          }}
+        />
+      </div>
+    );
+  }
+
   // ── Focus Mode: Full-screen (NO sidebar) ─────────────────────────────────
   if (focusMode || (timeLeft < modeSeconds && timeLeft > 0)) {
     return (
@@ -334,6 +689,358 @@ export default function DashboardPage() {
         </div>
 
         {showSessionPopup && <SessionPopup task={task} onAction={handlePopupComplete} />}
+      </div>
+    );
+  }
+
+  // ── MOBILE IDLE layout ──────────────────────────────────────────────────
+  if (isMobile) {
+    const mobProgress   = timeLeft / modeSeconds;
+    const mobDashOffset = MOB_CIRC * (1 - mobProgress);
+
+    return (
+      <div
+        style={{
+          /* Figma 192:4 frame: 402×874, White (#F2F2F2) background */
+          height:         '100dvh',
+          background:     '#F2F2F2',
+          display:        'flex',
+          flexDirection:  'column',
+          overflow:       'hidden',
+          position:       'relative',
+        }}
+      >
+        {/* ── Mobile Header (layout_799P1H) —
+              row, space-between, x=20, y=22, w=362
+              Streak left | Title center | Profile right
+        ── */}
+        <header
+          style={{
+            display:        'flex',
+            flexDirection:  'row',
+            alignItems:     'center',
+            justifyContent: 'space-between',
+            padding:        '22px 20px 0',
+            flexShrink:     0,
+          }}
+        >
+          {/* Streak badge — layout_XUYIOG: 53×24.7, Light Green rgba(187,233,194,0.5) */}
+          <div
+            style={{
+              width:          53,
+              height:         24.7,
+              background:     'rgba(187, 233, 194, 0.5)',
+              borderRadius:   24,
+              display:        'flex',
+              alignItems:     'center',
+              justifyContent: 'center',
+              gap:            5.15,  // layout_2JMTQL gap
+            }}
+          >
+            {/* Streak leaf icon — layout_BA4X4C: 11.58×11.58 */}
+            <svg width="11.58" height="11.58" viewBox="0 0 24 24" fill="none">
+              <path d="M12 2C7 2 3 7 3 12C3 13.9 3.7 15.6 4.8 17C4.8 17 6 15 8 15C8 17 7 19 6 20C7.5 21.3 9.7 22 12 22C17 22 21 17 21 12C21 6.5 17 3 14 4C14.5 5.5 14 8 12 9C12 7 11 5.5 12 2Z" fill="#006D37" />
+            </svg>
+            {/* "12" — style_ZN8LW3: Inter 500, 16.47px, Green */}
+            <span
+              style={{
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 500,
+                fontSize:   16.47,
+                lineHeight: 1,
+                color:      '#006D37',
+              }}
+            >
+              {currentStreak}
+            </span>
+          </div>
+
+          {/* Title — style_XYHB3Q: Space Grotesk 700, 20px, Black, center */}
+          <h1
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700,
+              fontSize:   20,
+              lineHeight: 1.276,
+              color:      '#1A1A1A',
+              margin:     0,
+            }}
+          >
+            Focus Forest
+          </h1>
+
+          {/* Profile — layout_KWIBDS: 28×28 */}
+          <button
+            onClick={() => navigate('/profile')}
+            style={{
+              background: 'none',
+              border:     'none',
+              padding:    0,
+              cursor:     'pointer',
+              width:      28,
+              height:     28,
+              display:    'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+            }}
+          >
+            <MobileProfileIcon />
+          </button>
+        </header>
+
+        {/* ── Scrollable body (layout_6063Y5) —
+              x=35, y=91, w=332, column, center, gap=38
+        ── */}
+        <main
+          style={{
+            flex:           1,
+            overflowY:      'auto',
+            /* x=35 → sides 35px (8.7% of 402), top matches y=91 - header height */
+            padding:        '25px 35px 90px',
+            display:        'flex',
+            flexDirection:  'column',
+            alignItems:     'center',
+            gap:            38,
+            boxSizing:      'border-box',
+          }}
+        >
+          {/* ── Forest image — layout_WPW8LI: w=fill, h=228 ── */}
+          <div
+            style={{
+              width:        '100%',
+              height:       228,
+              borderRadius: 12,
+              overflow:     'hidden',
+              flexShrink:   0,
+            }}
+          >
+            <img
+              src="/images/tree_hero.png"
+              alt="Focus Forest"
+              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            />
+          </div>
+
+          {/* ── Timer circle (layout_665RMR): 288×288 ──
+                Inner elements absolutely positioned per Figma coordinates:
+                  Time  "25:00" : x=54.5,  y=49.91,  w=178.67, h=82
+                  Start button  : x=95.17, y=149.9,  w=96.67,  h=36
+                  Label text    : x=108.6, y=235.24, w=72,     h=11
+          ── */}
+          <div
+            style={{
+              width:      MOB_SIZE,
+              height:     MOB_SIZE,
+              position:   'relative',
+              flexShrink: 0,
+            }}
+          >
+            {/* SVG ring */}
+            <svg
+              viewBox={`0 0 ${MOB_SIZE} ${MOB_SIZE}`}
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%' }}
+            >
+              {/* Track (Faded white #E8E8E8)  — Ellipse 1 */}
+              <circle
+                cx={MOB_SIZE / 2} cy={MOB_SIZE / 2} r={MOB_RADIUS}
+                fill="none" stroke="#E8E8E8" strokeWidth={MOB_STROKE}
+              />
+              {/* Progress arc (Green) — Ellipse 2 */}
+              <circle
+                cx={MOB_SIZE / 2} cy={MOB_SIZE / 2} r={MOB_RADIUS}
+                fill="none" stroke={ringColor} strokeWidth={MOB_STROKE}
+                strokeDasharray={MOB_CIRC}
+                strokeDashoffset={mobDashOffset}
+                strokeLinecap="round"
+                transform={`rotate(-90 ${MOB_SIZE / 2} ${MOB_SIZE / 2})`}
+                style={{ transition: 'stroke-dashoffset 0.5s linear' }}
+              />
+            </svg>
+
+            {/* Time "25:00" — layout_UIM932: x=54.5, y=49.91, w=178.67, h=82
+                style_3V19RG: Space Grotesk 700, 64px, lh=1.276 */}
+            <span
+              style={{
+                position:   'absolute',
+                left:       54.5,
+                top:        49.91,
+                width:      178.67,
+                height:     82,
+                display:    'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 700,
+                fontSize:   64,
+                lineHeight: 1.276,
+                color:      '#1A1A1A',
+                letterSpacing: '-2px',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {formatTime(timeLeft)}
+            </span>
+
+            {/* Start button (layout_OGSTZT / DC9K18 / 9V2WBX)
+                Frame: x=95.17, y=149.9, w=96.67, h=36
+                Shadow div offset: 2.67px x+y
+                Button: Green, w=94, h=33.33, radius=6
+                Text (style_90J5ES): Inter 700, 16px, Super White */}
+            <div
+              style={{
+                position: 'absolute',
+                left:     95.17,
+                top:      149.9,
+                width:    96.67,
+                height:   36,
+              }}
+            >
+              {/* Shadow (layout_DC9K18): offset 2.67px */}
+              <div
+                style={{
+                  position:     'absolute',
+                  inset:        0,
+                  background:   '#1A1A1A',
+                  borderRadius: 6,
+                  transform:    'translate(2.67px, 2.67px)',
+                }}
+              />
+              <button
+                onClick={handleStart}
+                style={{
+                  position:     'absolute',
+                  left:         0,
+                  top:          0,
+                  width:        94,
+                  height:       33.33,
+                  background:   '#006D37',
+                  border:       'none',
+                  borderRadius: 6,
+                  cursor:       'pointer',
+                  fontFamily:   "'Inter', sans-serif",
+                  fontWeight:   700,
+                  fontSize:     16,
+                  color:        '#FAFAFA',
+                  transition:   'transform 0.1s',
+                }}
+                onMouseDown={e  => (e.currentTarget.style.transform = 'translate(2.67px,2.67px)')}
+                onMouseUp={e    => (e.currentTarget.style.transform = 'none')}
+                onMouseLeave={e => (e.currentTarget.style.transform = 'none')}
+                onTouchStart={e  => ((e.currentTarget as HTMLButtonElement).style.transform = 'translate(2.67px,2.67px)')}
+                onTouchEnd={e    => ((e.currentTarget as HTMLButtonElement).style.transform = 'none')}
+              >
+                Start
+              </button>
+            </div>
+
+            {/* Mode label (layout_YE7KMO): x=108.6, y=235.24, w=72, h=11
+                style_7IHSYT: Inter 700, 9.33px, center */}
+            <span
+              style={{
+                position:  'absolute',
+                left:      108.6,
+                top:       235.24,
+                width:     72,
+                textAlign: 'center',
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 700,
+                fontSize:  9.33,
+                lineHeight: 1.21,
+                color:     '#1A1A1A',
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {modeLabel}
+            </span>
+          </div>
+
+          {/* ── Task + Variant (layout_HJMJU8): w=282.93, column, gap=35.81 ── */}
+          <div
+            style={{
+              width:          '100%',
+              maxWidth:       282.93,
+              display:        'flex',
+              flexDirection:  'column',
+              alignItems:     'center',
+              gap:            35.81,
+            }}
+          >
+            {/* Input (layout_64R2WR): 217.27×41.78, Super White, 0.6px border */}
+            <div
+              style={{
+                width:        217.27,
+                height:       41.78,
+                background:   '#FAFAFA',
+                border:       '0.6px solid #1A1A1A',
+                borderRadius: 4,
+                display:      'flex',
+                alignItems:   'center',
+                justifyContent: 'center',
+                boxSizing:    'border-box',
+              }}
+            >
+              <input
+                type="text"
+                placeholder="Add Task (Optional)"
+                value={task}
+                onChange={e => setTask(e.target.value)}
+                style={{
+                  background:  'none',
+                  border:      'none',
+                  outline:     'none',
+                  width:       '100%',
+                  padding:     '0 12px',
+                  textAlign:   'center',
+                  fontFamily:  "'Inter', sans-serif",
+                  fontWeight:  500,
+                  /* style_IOW0DO: fontSize=11.94 */
+                  fontSize:    11.94,
+                  color:       '#1A1A1A',
+                }}
+              />
+            </div>
+
+            {/* "CHANGE TIMER VARIANT"
+                style_6C7XVA: Space Grotesk 700, 11.94px, UPPER, ls=2.4% */}
+            <button
+              onClick={() => setShowVariantPicker(true)}
+              style={{
+                background:     'none',
+                border:         'none',
+                cursor:         'pointer',
+                fontFamily:     "'Space Grotesk', sans-serif",
+                fontWeight:     700,
+                fontSize:       11.94,
+                lineHeight:     0.8,
+                textTransform:  'uppercase',
+                letterSpacing:  '2.4%',
+                textDecoration: 'underline',
+                textUnderlineOffset: '3px',
+                color:          '#1A1A1A',
+                padding:        '4px 0',
+                transition:     'opacity 0.2s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.opacity = '0.6')}
+              onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
+            >
+              Change Timer Variant
+            </button>
+          </div>
+        </main>
+
+        {showSessionPopup && <SessionPopup task={task} onAction={handlePopupComplete} />}
+
+        <VariantPickerModal
+          isOpen={showVariantPicker}
+          onClose={() => setShowVariantPicker(false)}
+          onContinue={() => {
+            setShowVariantPicker(false);
+            setRunning(true);
+          }}
+        />
+
+        {/* Bottom nav — layout_R8KTTY: y=799, h=75, radius 24 24 0 0 */}
+        <MobileBottomNav activePage="dashboard" />
       </div>
     );
   }
