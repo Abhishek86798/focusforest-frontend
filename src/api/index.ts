@@ -1,13 +1,18 @@
-import { apiClient } from './client';
+import apiClient from './client';
 import type {
   User,
   DailyTree,
+  WeekData,
   Session,
   CreateSessionBody,
   CreateSessionResponse,
   Group,
+  GroupDetails,
+  GroupStats,
+  GroupMemberStatus,
   LeaderboardEntry,
   GroupLeaderboardEntry,
+  StatsSummary,
 } from '../types';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -35,33 +40,49 @@ export const treeApi = {
   today: () => apiClient.get<DailyTree>('/trees/today').then(r => r.data),
 
   /** Get calendar data for a given month */
-  calendar: (month: number, year: number) =>
+  calendar: (month?: number, year?: number) =>
     apiClient
-      .get<DailyTree[]>('/trees/calendar', { params: { month, year } })
+      .get<{ trees: DailyTree[] }>('/trees/calendar', { params: month && year ? { month, year } : {} })
       .then(r => r.data),
 
   /** Get all 7 days of a specific week by weekId */
   week: (weekId: string) =>
-    apiClient.get<DailyTree[]>(`/trees/week/${weekId}`).then(r => r.data),
+    apiClient.get<WeekData>(`/trees/week/${weekId}`).then(r => r.data),
 };
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
 
 export const sessionApi = {
-  /** Submit a completed Pomodoro session */
+  /** Start an immersive session with live tracking */
+  start: (body: { variant: string; focusMinutes: number; taskText?: string | null; clientSessionId: string }) =>
+    apiClient.post<{ sessionId: string; expectedEndAt: string }>('/sessions/start', body).then(r => r.data),
+
+  /** Complete an active session */
+  complete: (sessionId: string, taskStatus: 'completed' | 'carried' | 'none') =>
+    apiClient.post<CreateSessionResponse>(`/sessions/${sessionId}/complete`, { taskStatus }).then(r => r.data),
+
+  /** Abandon an active session */
+  abandon: (sessionId: string) =>
+    apiClient.post<{ message: string }>(`/sessions/${sessionId}/abandon`).then(r => r.data),
+
+  /** Submit a completed Pomodoro session (legacy instant submit) */
   create: (body: CreateSessionBody) =>
     apiClient.post<CreateSessionResponse>('/sessions', body).then(r => r.data),
 
   /** Get session history (optional date filter) */
   list: (startDate?: string, endDate?: string) =>
     apiClient
-      .get<Session[]>('/sessions', { params: { startDate, endDate } })
+      .get<{ sessions: Session[]; total: number }>('/sessions', { params: { startDate, endDate } })
       .then(r => r.data),
 };
 
 // ── Groups ────────────────────────────────────────────────────────────────────
 
 export const groupApi = {
+  /** Get all groups for the current user */
+  list: () =>
+    apiClient.get<{ groups: Group[] }>('/groups').then(r => r.data),
+
   /** Create a new group */
   create: (name: string) =>
     apiClient.post<Group>('/groups', { name }).then(r => r.data),
@@ -72,13 +93,25 @@ export const groupApi = {
 
   /** Get group details + members + stats */
   get: (groupId: string) =>
-    apiClient.get<Group>(`/groups/${groupId}`).then(r => r.data),
+    apiClient.get<GroupDetails>(`/groups/${groupId}`).then(r => r.data),
+
+  /** Get group stats */
+  stats: (groupId: string) =>
+    apiClient.get<GroupStats>(`/groups/${groupId}/stats`).then(r => r.data),
+
+  /** Get group member status */
+  memberStatus: (groupId: string) =>
+    apiClient.get<{ members: GroupMemberStatus[] }>(`/groups/${groupId}/members/status`).then(r => r.data),
 
   /** Get group calendar */
-  calendar: (groupId: string, month: number, year: number) =>
+  calendar: (groupId: string, month?: number, year?: number) =>
     apiClient
-      .get<DailyTree[]>(`/groups/${groupId}/calendar`, { params: { month, year } })
+      .get<{ days: any[] }>(`/groups/${groupId}/calendar`, { params: month && year ? { month, year } : {} })
       .then(r => r.data),
+
+  /** Delete a group (admin only) */
+  delete: (groupId: string) =>
+    apiClient.delete(`/groups/${groupId}`),
 
   /** Leave or remove a member from a group */
   removeMember: (groupId: string, userId: string) =>
@@ -89,14 +122,28 @@ export const groupApi = {
 
 export const leaderboardApi = {
   /** Solo leaderboard */
-  solo: (scope: 'global' | 'friends' = 'global', page = 1) =>
+  solo: (scope: 'global' | 'none' = 'global', page = 1) =>
     apiClient
-      .get<LeaderboardEntry[]>('/leaderboard/solo', { params: { scope, page } })
+      .get<{ scope: string; page: number; total: number; entries: LeaderboardEntry[] }>(
+        '/leaderboard/solo',
+        { params: { scope, page, limit: 20 } }
+      )
       .then(r => r.data),
 
   /** Groups leaderboard */
-  groups: (scope: 'global' | 'friends' = 'global', page = 1) =>
+  groups: (scope: 'global' | 'none' = 'global', page = 1) =>
     apiClient
-      .get<GroupLeaderboardEntry[]>('/leaderboard/groups', { params: { scope, page } })
+      .get<{ scope: string; page: number; total: number; entries: GroupLeaderboardEntry[] }>(
+        '/leaderboard/groups',
+        { params: { scope, page, limit: 20 } }
+      )
       .then(r => r.data),
+};
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+
+export const statsApi = {
+  /** Get user stats summary */
+  summary: () =>
+    apiClient.get<StatsSummary>('/stats/summary').then(r => r.data),
 };

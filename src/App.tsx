@@ -1,7 +1,8 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import { ErrorBoundary } from 'react-error-boundary';
 import { useAuthStore } from './stores/authStore';
-
+import ProtectedRoute from './components/ProtectedRoute';
 
 // ── Pages ─────────────────────────────────────────────────────────────────────
 import LoginPage          from './pages/LoginPage';
@@ -10,46 +11,113 @@ import DashboardPage      from './pages/DashboardPage';
 import CalendarPage       from './pages/CalendarPage';
 import StatsDashboardPage from './pages/StatsDashboardPage';
 import GroupsPage         from './pages/GroupsPage';
-import GroupDetailPage    from './pages/GroupDetailPage';
 import LeaderboardPage    from './pages/LeaderboardPage';
 import ZenModePage        from './pages/ZenModePage';
 import ProfilePage        from './pages/ProfilePage';
+import NotFoundPage       from './pages/NotFoundPage';
 import {
   SessionPage,
 } from './pages/StubPages';
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-function P({ children }: { children: React.ReactNode }) {
-  return <>{children}</>;
+// ── Error Fallback ────────────────────────────────────────────────────────────
+function ErrorFallback() {
+  return (
+    <div
+      style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        minHeight: '100vh',
+        background: '#F2F2F2',
+        padding: '20px',
+        textAlign: 'center',
+      }}
+    >
+      <div
+        style={{
+          background: '#FFFFFF',
+          border: '2px solid #1A1A1A',
+          boxShadow: '4px 4px 0px 0px rgba(26,26,26,1)',
+          borderRadius: '8px',
+          padding: '48px 32px',
+          maxWidth: '500px',
+        }}
+      >
+        <h1
+          style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 700,
+            fontSize: '24px',
+            color: '#1A1A1A',
+            marginBottom: '16px',
+          }}
+        >
+          Something went wrong
+        </h1>
+        <p
+          style={{
+            fontFamily: "'Inter', sans-serif",
+            fontSize: '16px',
+            color: 'rgba(26,26,26,0.6)',
+            marginBottom: '24px',
+          }}
+        >
+          The app encountered an unexpected error.
+        </p>
+        <a
+          href="/"
+          style={{
+            display: 'inline-block',
+            padding: '12px 24px',
+            background: '#006D37',
+            color: '#FAFAFA',
+            border: '2px solid #1A1A1A',
+            boxShadow: '4px 4px 0px 0px rgba(26,26,26,1)',
+            borderRadius: '4px',
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: '16px',
+            fontWeight: 700,
+            textDecoration: 'none',
+            textTransform: 'uppercase',
+          }}
+        >
+          Reload App
+        </a>
+      </div>
+    </div>
+  );
 }
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
-  const checkAuth = useAuthStore(s => s.checkAuth);
-
-  // Restore session from httpOnly cookie on every app load
-  useEffect(() => { checkAuth(); }, [checkAuth]);
+  // Restore session from httpOnly cookie on app load - RUNS ONCE
+  useEffect(() => {
+    useAuthStore.getState().checkAuth();
+  }, []); // empty array — runs ONCE on mount only
 
   return (
-    <Routes>
-      {/* ── Public ── */}
-      <Route path="/login"  element={<LoginPage />} />
-      <Route path="/signup" element={<SignupPage />} />
+    <ErrorBoundary FallbackComponent={ErrorFallback}>
+      <Routes>
+        {/* ── Public Routes ── */}
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/signup" element={<SignupPage />} />
 
-      {/* ── Protected ── */}
-      <Route path="/dashboard"       element={<P><DashboardPage /></P>} />
-      <Route path="/session"         element={<P><SessionPage /></P>} />
-      <Route path="/calendar"        element={<P><CalendarPage /></P>} />
-      <Route path="/stats"           element={<P><StatsDashboardPage /></P>} />
-      <Route path="/profile"         element={<P><ProfilePage /></P>} />
-      <Route path="/leaderboard"     element={<P><LeaderboardPage /></P>} />
-      <Route path="/groups"          element={<P><GroupsPage /></P>} />
-      <Route path="/groups/:id"      element={<P><GroupDetailPage /></P>} />
-      <Route path="/zen"             element={<P><ZenModePage /></P>} />
+        {/* ── Protected Routes ── */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/" element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/session" element={<SessionPage />} />
+          <Route path="/calendar" element={<CalendarPage />} />
+          <Route path="/stats" element={<StatsDashboardPage />} />
+          <Route path="/groups" element={<GroupsPage />} />
+          <Route path="/leaderboard" element={<LeaderboardPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/zen" element={<ZenModePage />} />
+        </Route>
 
-      {/* ── Default: / → /dashboard ── */}
-      <Route path="/"  element={<Navigate to="/dashboard" replace />} />
-      <Route path="*"  element={<Navigate to="/dashboard" replace />} />
-    </Routes>
+        {/* ── 404 Not Found ── */}
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </ErrorBoundary>
   );
 }

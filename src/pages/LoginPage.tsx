@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -24,9 +24,17 @@ const BORDER  = '#2d6a30';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  const { login, isLoading } = useAuthStore();
+  const login = useAuthStore(state => state.login);
+  const user = useAuthStore(state => state.user);
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
 
   const {
     register,
@@ -36,19 +44,23 @@ export default function LoginPage() {
 
   const onSubmit = async (data: FormData) => {
     setServerError(null);
-    console.log("SENDING CREDENTIALS:", { 
-      email: `"${data.email}"`, 
-      password: `"${data.password}"` 
-    });
     try {
       await login(data.email.trim(), data.password.trim());
-      navigate('/dashboard', { replace: true });
-    } catch {
-      setServerError('Invalid email or password');
+      // Small delay to ensure cookie is set before navigation
+      await new Promise(resolve => setTimeout(resolve, 100));
+      navigate('/', { replace: true });
+    } catch (err: any) {
+      if (err.response?.status === 401) {
+        setServerError('Invalid email or password');
+      } else if (err.response?.status === 400) {
+        setServerError('Please check your inputs');
+      } else {
+        setServerError('Something went wrong. Please try again.');
+      }
     }
   };
 
-  const busy = isSubmitting || isLoading;
+  const busy = isSubmitting;
 
   return (
     <div

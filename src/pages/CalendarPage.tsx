@@ -1,7 +1,8 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import Sidebar from '../components/Sidebar';
 import MobileBottomNav from '../components/MobileBottomNav';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { useTreeCalendar, useWeekData, useStatsSummary } from '../hooks/useForestData';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const DARK = '#1A1A1A';
@@ -15,35 +16,16 @@ const MUTED = '#3D4A3E';
 
 // ─── Heatmap data generation ────────────────────────────────────────────────────
 const MONTHS = ['JAN', 'FEB', 'MAR', 'APR', 'MAY', 'JUN', 'JUL', 'AUG', 'SEP', 'OCT', 'NOV', 'DEC'];
-const WEEKS = 53;
 
-function seededRandom(seed: number) {
-  const x = Math.sin(seed + 1) * 10000;
-  return x - Math.floor(x);
-}
-
-function generateHeatmapRow(rowIdx: number): number[] {
-  return Array.from({ length: WEEKS }, (_, w) => {
-    const r = seededRandom(rowIdx * 1000 + w * 7);
-    const monthInfluence = Math.sin((w / WEEKS) * Math.PI * 2.5) * 0.3 + 0.7;
-    if (r > 0.35 * monthInfluence) {
-      const intensity = Math.ceil(seededRandom(rowIdx * 500 + w) * 4);
-      return Math.min(intensity, 4);
-    }
-    return 0;
-  });
-}
-
-const HEATMAP_DATA = Array.from({ length: 7 }).map((_, i) => generateHeatmapRow(i));
-
-function cellColor(value: number): string {
-  if (value === 0) return 'transparent';
-  const alphas = [0.25, 0.45, 0.7, 1];
-  return `rgba(0, 109, 55, ${alphas[value - 1]})`;
+function cellColor(stage: number): string {
+  if (stage === 0) return 'transparent';
+  // stage 1 = 25%, 2 = 50%, 3 = 75%, 4 = 100%
+  const alphas = [0.25, 0.5, 0.75, 1];
+  return `rgba(0, 109, 55, ${alphas[Math.min(stage - 1, 3)]})`;
 }
 
 // ─── Focus Grid Component ───────────────────────────────────────────────────────
-function FocusGrid({ year, isMobile }: { year: number; isMobile: boolean }) {
+function FocusGrid({ year, isMobile, heatmapData }: { year: number; isMobile: boolean; heatmapData: (number | null)[][] }) {
   return (
     <div
       style={{
@@ -113,18 +95,18 @@ function FocusGrid({ year, isMobile }: { year: number; isMobile: boolean }) {
 
           {/* Heatmap rows */}
           <div style={{ display: 'flex', flexDirection: 'column', gap: isMobile ? '2px' : '8px' }}>
-            {HEATMAP_DATA.map((row, ri) => (
+            {heatmapData.map((row, ri) => (
               <div key={ri} style={{ display: 'flex', gap: isMobile ? '2px' : '3px' }}>
-                {row.map((val, wi) => (
+                {row.map((stage, wi) => (
                   <div
                     key={wi}
-                    title={val > 0 ? `${val} session${val > 1 ? 's' : ''}` : 'No sessions'}
+                    title={stage !== null ? `Stage ${stage}` : 'No data'}
                     style={{
                       width: isMobile ? '10px' : '14px',
                       height: isMobile ? '10px' : '14px',
                       flexShrink: 0,
-                      background: val === 0 ? 'transparent' : cellColor(val),
-                      border: val === 0 ? `1px solid rgba(26,26,26,0.2)` : 'none',
+                      background: stage !== null ? cellColor(stage) : 'transparent',
+                      border: stage === null || stage === 0 ? `1px solid rgba(26,26,26,0.2)` : 'none',
                       borderRadius: '2px',
                       cursor: 'default',
                       transition: 'opacity 0.15s',
@@ -183,14 +165,34 @@ function StatCard({ label, value, isMobile }: { label: string; value: string; is
 }
 
 // ─── Monthly Efforts ────────────────────────────────────────────────────────────
-const WEEKS_DATA = [
-  { label: 'Week 1', summary: 'You completed 18 sessions and help growing 5 trees!!' },
-  { label: 'Week 2', summary: 'You completed 18 sessions and help growing 5 trees!!' },
-  { label: 'Week 3', summary: 'You completed 18 sessions and help growing 5 trees!!' },
-  { label: 'Week 4', summary: 'You completed 18 sessions and help growing 5 trees!!' },
-];
+function MonthlyEfforts({ isMobile, currentMonth, currentYear }: { isMobile: boolean; currentMonth: number; currentYear: number }) {
+  // Calculate week IDs for current month
+  const getWeekIdsForMonth = (month: number, year: number): string[] => {
+    const firstDay = new Date(year, month - 1, 1);
+    const lastDay = new Date(year, month, 0);
+    
+    const getWeekId = (date: Date): string => {
+      const startOfYear = new Date(date.getFullYear(), 0, 1);
+      const days = Math.floor((date.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
+      const weekNumber = Math.ceil((days + startOfYear.getDay() + 1) / 7);
+      return `${date.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
+    };
+    
+    const weeks = new Set<string>();
+    const current = new Date(firstDay);
+    while (current <= lastDay) {
+      weeks.add(getWeekId(current));
+      current.setDate(current.getDate() + 7);
+    }
+    
+    return Array.from(weeks).sort();
+  };
 
-function MonthlyEfforts({ isMobile }: { isMobile: boolean }) {
+  const weekIds = getWeekIdsForMonth(currentMonth, currentYear);
+  
+  // Fetch week data for each week
+  const weekQueries = weekIds.map(weekId => useWeekData(weekId));
+  
   return (
     <div style={{
       background: WHITE,
@@ -213,70 +215,90 @@ function MonthlyEfforts({ isMobile }: { isMobile: boolean }) {
       </span>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0' }}>
-        {WEEKS_DATA.map((week, i) => (
-          <div
-            key={i}
-            style={{
-              display: 'flex',
-              flexDirection: isMobile ? 'column' : 'row',
-              alignItems: isMobile ? 'flex-start' : 'center',
-              justifyContent: 'space-between',
-              padding: isMobile ? '12px' : '16px 16px',
-              border: `1px solid ${DARK}`,
-              borderBottom: i < WEEKS_DATA.length - 1 ? 'none' : `1px solid ${DARK}`,
-              background: WHITE,
-              gap: isMobile ? '8px' : '16px',
-              transition: 'background 0.15s',
-            }}
-          >
-            {/* Week label */}
-            <span style={{
-              fontFamily: "'Inter', sans-serif",
-              fontWeight: 600,
-              fontSize: isMobile ? '12px' : '14px',
-              color: DARK2,
-              flexShrink: 0,
-              width: isMobile ? 'auto' : '60px',
-            }}>
-              {week.label}
-            </span>
-
-            {/* Summary */}
-            <span style={{
-              fontFamily: "'Inter', sans-serif",
-              fontWeight: 400,
-              fontSize: isMobile ? '12px' : '14px',
-              color: DARK2,
-              flex: 1,
-              textAlign: isMobile ? 'left' : 'center',
-            }}>
-              {week.summary}
-            </span>
-
-            {/* View button */}
-            <button
+        {weekQueries.map((query, i) => {
+          const weekData = query.data;
+          const weekLabel = `Week ${i + 1}`;
+          
+          // Calculate summary
+          let totalSessions = 0;
+          let treesCompleted = 0;
+          
+          if (weekData?.days) {
+            weekData.days.forEach(day => {
+              totalSessions += day.totalSessions || 0;
+              if (day.stage === 4) treesCompleted++;
+            });
+          }
+          
+          const summary = weekData 
+            ? `You completed ${totalSessions} session${totalSessions !== 1 ? 's' : ''} and helped grow ${treesCompleted} tree${treesCompleted !== 1 ? 's' : ''}!`
+            : 'Loading...';
+          
+          return (
+            <div
+              key={weekIds[i]}
               style={{
-                flexShrink: 0,
-                background: GREEN,
-                border: 'none',
-                borderRadius: '2px',
-                padding: isMobile ? '6px 12px' : '6px 14px',
-                fontFamily: "'Space Grotesk', sans-serif",
-                fontWeight: 700,
-                fontSize: isMobile ? '10px' : '11px',
-                textTransform: 'uppercase',
-                color: SUPER_WHITE,
-                cursor: 'pointer',
-                letterSpacing: '0.05em',
-                boxShadow: '2px 2px 0px rgba(0,0,0,0.3)',
-                transition: 'opacity 0.15s, transform 0.1s',
-                alignSelf: isMobile ? 'flex-end' : 'auto',
+                display: 'flex',
+                flexDirection: isMobile ? 'column' : 'row',
+                alignItems: isMobile ? 'flex-start' : 'center',
+                justifyContent: 'space-between',
+                padding: isMobile ? '12px' : '16px 16px',
+                border: `1px solid ${DARK}`,
+                borderBottom: i < weekQueries.length - 1 ? 'none' : `1px solid ${DARK}`,
+                background: WHITE,
+                gap: isMobile ? '8px' : '16px',
+                transition: 'background 0.15s',
               }}
             >
-              View
-            </button>
-          </div>
-        ))}
+              {/* Week label */}
+              <span style={{
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 600,
+                fontSize: isMobile ? '12px' : '14px',
+                color: DARK2,
+                flexShrink: 0,
+                width: isMobile ? 'auto' : '60px',
+              }}>
+                {weekLabel}
+              </span>
+
+              {/* Summary */}
+              <span style={{
+                fontFamily: "'Inter', sans-serif",
+                fontWeight: 400,
+                fontSize: isMobile ? '12px' : '14px',
+                color: DARK2,
+                flex: 1,
+                textAlign: isMobile ? 'left' : 'center',
+              }}>
+                {summary}
+              </span>
+
+              {/* View button */}
+              <button
+                style={{
+                  flexShrink: 0,
+                  background: GREEN,
+                  border: 'none',
+                  borderRadius: '2px',
+                  padding: isMobile ? '6px 12px' : '6px 14px',
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontWeight: 700,
+                  fontSize: isMobile ? '10px' : '11px',
+                  textTransform: 'uppercase',
+                  color: SUPER_WHITE,
+                  cursor: 'pointer',
+                  letterSpacing: '0.05em',
+                  boxShadow: '2px 2px 0px rgba(0,0,0,0.3)',
+                  transition: 'opacity 0.15s, transform 0.1s',
+                  alignSelf: isMobile ? 'flex-end' : 'auto',
+                }}
+              >
+                View
+              </button>
+            </div>
+          );
+        })}
       </div>
     </div>
   );
@@ -288,7 +310,39 @@ type Category = 'solo' | 'groups';
 export default function CalendarPage() {
   const [category, setCategory] = useState<Category>('solo');
   const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1; // 1-12
   const isMobile = useIsMobile();
+  
+  // Fetch calendar data (all trees for the year)
+  const { data: calendarData } = useTreeCalendar();
+  const trees = calendarData?.trees || [];
+  
+  // Fetch stats summary
+  const { data: stats } = useStatsSummary();
+  
+  // Build heatmap matrix (7 rows x 53 columns) from tree data
+  const heatmapData = useMemo(() => {
+    const matrix: (number | null)[][] = Array.from({ length: 7 }, () => Array(53).fill(null));
+    const yearStart = new Date(currentYear, 0, 1);
+    const yearStartDay = yearStart.getDay(); // 0(Sun) - 6(Sat)
+    
+    trees.forEach(tree => {
+      const treeDate = new Date(tree.date);
+      if (treeDate.getFullYear() === currentYear) {
+        const diffTime = treeDate.getTime() - yearStart.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+        const dayOfWeek = treeDate.getDay();
+        const weekIndex = Math.floor((diffDays + yearStartDay) / 7);
+        
+        if (weekIndex >= 0 && weekIndex < 53 && dayOfWeek >= 0 && dayOfWeek < 7) {
+          // Use stage for coloring: 0 (seed/bare) to 4 (full tree)
+          matrix[dayOfWeek][weekIndex] = tree.isBare ? 0 : tree.stage;
+        }
+      }
+    });
+    
+    return matrix;
+  }, [trees, currentYear]);
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: BG }}>
@@ -366,7 +420,25 @@ export default function CalendarPage() {
         </div>
 
         {/* ── Focus Grid (GitHub-style heatmap) ── */}
-        <FocusGrid year={currentYear} isMobile={isMobile} />
+        {category === 'solo' ? (
+          <FocusGrid year={currentYear} isMobile={isMobile} heatmapData={heatmapData} />
+        ) : (
+          <div style={{
+            background: SUPER_WHITE,
+            border: `2px solid ${DARK}`,
+            boxShadow: SHADOW,
+            padding: isMobile ? '40px 20px' : '80px 40px',
+            textAlign: 'center',
+          }}>
+            <span style={{
+              fontFamily: "'Inter', sans-serif",
+              fontSize: isMobile ? '14px' : '16px',
+              color: MUTED,
+            }}>
+              Join a group to see group calendar
+            </span>
+          </div>
+        )}
 
         {/* ── Yearly stat cards ── */}
         <div style={{
@@ -374,14 +446,14 @@ export default function CalendarPage() {
           gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)',
           gap: isMobile ? '12px' : '29px',
         }}>
-          <StatCard label="Total Minutes" value="14000" isMobile={isMobile} />
-          <StatCard label="Trees Completed" value="284" isMobile={isMobile} />
-          <StatCard label="Task Completion" value="74%" isMobile={isMobile} />
-          <StatCard label="Sessions" value="700" isMobile={isMobile} />
+          <StatCard label="Total Minutes" value={stats?.totalMinutes?.toString() ?? '--'} isMobile={isMobile} />
+          <StatCard label="Trees Completed" value={stats?.treesCompleted?.toString() ?? '--'} isMobile={isMobile} />
+          <StatCard label="Task Completion" value={stats ? `${Math.round(stats.taskCompletionRate * 100)}%` : '--'} isMobile={isMobile} />
+          <StatCard label="Sessions" value={stats?.sessions?.toString() ?? '--'} isMobile={isMobile} />
         </div>
 
         {/* ── Monthly Efforts ── */}
-        <MonthlyEfforts isMobile={isMobile} />
+        <MonthlyEfforts isMobile={isMobile} currentMonth={currentMonth} currentYear={currentYear} />
       </main>
 
       {isMobile && <MobileBottomNav activePage="calendar" />}

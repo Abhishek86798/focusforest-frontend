@@ -74,6 +74,15 @@ export function todayISO(): string {
   return new Date().toISOString().split('T')[0];
 }
 
+/** Get current week ID in YYYY-Www format (e.g. "2026-W14") */
+export function getCurrentWeekId(): string {
+  const now = new Date();
+  const startOfYear = new Date(now.getFullYear(), 0, 1);
+  const days = Math.floor((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
+  const weekNumber = Math.ceil((days + startOfYear.getDay() + 1) / 7);
+  return `${now.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
+}
+
 // ── String helpers ─────────────────────────────────────────────────────────────
 
 /** Get initials from a full name e.g. "Abhik Roy" → "AR" */

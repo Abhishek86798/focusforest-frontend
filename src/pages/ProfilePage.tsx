@@ -1,12 +1,17 @@
 /**
- * ProfilePage — Responsive implementation
+ * ProfilePage — Responsive implementation with full API integration
  */
 
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import MobileBottomNav from '../components/MobileBottomNav';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useAuthStore } from '../stores/authStore';
+import { useSessionStore } from '../stores/sessionStore';
+import { useStatsSummary, useWeekData } from '../hooks/useForestData';
+import { getCurrentWeekId } from '../utils';
+import { VARIANT_CONFIGS, type SessionVariant } from '../types';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const BG         = '#F2F2F2';
@@ -116,6 +121,25 @@ function ProfileHeader({ isMobile, userName }: { isMobile: boolean; userName: st
 
 // ─── Section: Stats Bento Grid ────────────────────────────────────────────────
 function StatsBentoGrid({ isMobile }: { isMobile: boolean }) {
+  const { user } = useAuthStore();
+  const { lastStreak } = useSessionStore();
+  const { data: stats } = useStatsSummary();
+  const weekId = getCurrentWeekId();
+  const { data: weekData } = useWeekData(weekId);
+
+  // Calculate trees this week (count days where stage === 4)
+  const treesThisWeek = weekData?.days?.filter(day => day.stage === 4).length || 0;
+
+  // Use lastStreak from sessionStore (most recent from POST /sessions/:id/complete)
+  // Falls back to user.currentStreak from auth, or 0
+  const currentStreak = lastStreak ?? user?.currentStreak ?? 0;
+
+  // Focus hours from stats (totalMinutes / 60)
+  const focusHours = stats?.totalMinutes ? Math.round(stats.totalMinutes / 60) : '--';
+
+  // Trees grown from stats
+  const treesGrown = stats?.treesCompleted ?? '--';
+
   return (
     <div style={{
       display: 'flex',
@@ -185,7 +209,7 @@ function StatsBentoGrid({ isMobile }: { isMobile: boolean }) {
           color: SUPERWHITE,
           display: 'block',
         }}>
-          124
+          {currentStreak}
         </span>
       </div>
 
@@ -222,7 +246,7 @@ function StatsBentoGrid({ isMobile }: { isMobile: boolean }) {
             lineHeight: '1.11em',
             color: DARK,
           }}>
-            1,482
+            {treesGrown}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <TrendUpIcon />
@@ -232,7 +256,7 @@ function StatsBentoGrid({ isMobile }: { isMobile: boolean }) {
               textTransform: 'uppercase', letterSpacing: '0.05em',
               color: GREEN, lineHeight: 1.33,
             }}>
-              +12 this week
+              +{treesThisWeek} this week
             </span>
           </div>
         </div>
@@ -263,7 +287,7 @@ function StatsBentoGrid({ isMobile }: { isMobile: boolean }) {
             lineHeight: '1.11em',
             color: DARK,
           }}>
-            840
+            {focusHours}
           </span>
           <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
             <ClockIcon />
@@ -273,7 +297,7 @@ function StatsBentoGrid({ isMobile }: { isMobile: boolean }) {
               textTransform: 'uppercase', letterSpacing: '0.05em',
               color: GREEN, lineHeight: 1.33,
             }}>
-              Top 5% User
+              Keep it up!
             </span>
           </div>
         </div>
@@ -284,62 +308,195 @@ function StatsBentoGrid({ isMobile }: { isMobile: boolean }) {
 
 // ─── Section: Account Details ─────────────────────────────────────────────────
 function AccountDetails({ isMobile, onSignOut }: { isMobile: boolean; onSignOut: () => void }) {
-  return (
-    <div style={{
-      display: 'flex',
-      flexDirection: 'column',
-      gap: isMobile ? '16px' : '24px',
-      paddingBottom: isMobile ? '24px' : '48px',
-      width: '100%',
-    }}>
-      {/* Heading */}
-      <span style={{
-        fontFamily: "'Space Grotesk', sans-serif",
-        fontWeight: 700,
-        fontSize: isMobile ? '16px' : '20px',
-        lineHeight: '1.4em',
-        textTransform: 'uppercase',
-        letterSpacing: '-0.025em',
-        color: DARK,
-      }}>
-        Account Details
-      </span>
+  const [showVariantModal, setShowVariantModal] = useState(false);
+  const [selectedVariant, setSelectedVariant] = useState<SessionVariant>(() => {
+    return (localStorage.getItem('focusforest_default_variant') as SessionVariant) || 'classic';
+  });
 
-      {/* Border container */}
+  // Get timezone string
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  const handleVariantSelect = (variant: SessionVariant) => {
+    setSelectedVariant(variant);
+    localStorage.setItem('focusforest_default_variant', variant);
+    setShowVariantModal(false);
+  };
+
+  return (
+    <>
       <div style={{
         display: 'flex',
         flexDirection: 'column',
-        borderTop: `1px solid ${DARK}`,
+        gap: isMobile ? '16px' : '24px',
+        paddingBottom: isMobile ? '24px' : '48px',
+        width: '100%',
       }}>
-        <SettingsRow
-          icon={<PersonIcon />}
-          label="Set Default Variant"
-          showChevron
-          isMobile={isMobile}
-        />
-        <SettingsRow
-          icon={<LockIcon />}
-          label="Time Zone"
-          showChevron
-          borderTop
-          isMobile={isMobile}
-        />
-        <SettingsRow
-          icon={<SignOutIcon />}
-          label="Sign Out"
-          color={RED}
-          borderTop
-          isMobile={isMobile}
-          onClick={onSignOut}
-        />
+        {/* Heading */}
+        <span style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontWeight: 700,
+          fontSize: isMobile ? '16px' : '20px',
+          lineHeight: '1.4em',
+          textTransform: 'uppercase',
+          letterSpacing: '-0.025em',
+          color: DARK,
+        }}>
+          Account Details
+        </span>
+
+        {/* Border container */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          borderTop: `1px solid ${DARK}`,
+        }}>
+          <SettingsRow
+            icon={<PersonIcon />}
+            label="Set Default Variant"
+            value={VARIANT_CONFIGS.find(v => v.id === selectedVariant)?.label}
+            showChevron
+            isMobile={isMobile}
+            onClick={() => setShowVariantModal(true)}
+          />
+          <SettingsRow
+            icon={<LockIcon />}
+            label="Time Zone"
+            value={timezone}
+            borderTop
+            isMobile={isMobile}
+          />
+          <SettingsRow
+            icon={<SignOutIcon />}
+            label="Sign Out"
+            color={RED}
+            borderTop
+            isMobile={isMobile}
+            onClick={onSignOut}
+          />
+        </div>
       </div>
-    </div>
+
+      {/* Variant Picker Modal */}
+      {showVariantModal && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          background: 'rgba(26,26,26,0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '20px',
+        }}>
+          <div style={{
+            background: SUPERWHITE,
+            border: `2px solid ${DARK}`,
+            boxShadow: SHADOW_MD,
+            borderRadius: '8px',
+            padding: isMobile ? '24px' : '32px',
+            maxWidth: '500px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflowY: 'auto',
+          }}>
+            <h3 style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: isMobile ? '20px' : '24px',
+              fontWeight: 700,
+              color: DARK,
+              marginBottom: '24px',
+              textTransform: 'uppercase',
+            }}>
+              Set Default Variant
+            </h3>
+
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              gap: '12px',
+            }}>
+              {VARIANT_CONFIGS.filter(v => v.id !== 'custom').map((variant) => (
+                <div
+                  key={variant.id}
+                  onClick={() => handleVariantSelect(variant.id)}
+                  style={{
+                    padding: isMobile ? '16px' : '20px',
+                    background: selectedVariant === variant.id ? GREEN : WHITE,
+                    border: `2px solid ${DARK}`,
+                    borderRadius: '4px',
+                    cursor: 'pointer',
+                    transition: 'transform 0.15s',
+                  }}
+                >
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    marginBottom: '8px',
+                  }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '12px',
+                    }}>
+                      <span style={{ fontSize: '24px' }}>{variant.emoji}</span>
+                      <span style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontWeight: 700,
+                        fontSize: isMobile ? '16px' : '18px',
+                        color: selectedVariant === variant.id ? SUPERWHITE : DARK,
+                      }}>
+                        {variant.label}
+                      </span>
+                    </div>
+                    {selectedVariant === variant.id && (
+                      <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
+                        <circle cx="10" cy="10" r="9" fill={SUPERWHITE} />
+                        <path d="M6 10L8.8 13L14 7" stroke={GREEN} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    )}
+                  </div>
+                  <span style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: isMobile ? '12px' : '14px',
+                    color: selectedVariant === variant.id ? 'rgba(250,250,250,0.8)' : '#666',
+                  }}>
+                    {variant.description}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            <button
+              onClick={() => setShowVariantModal(false)}
+              style={{
+                width: '100%',
+                marginTop: '24px',
+                padding: '12px',
+                background: WHITE,
+                color: DARK,
+                border: `2px solid ${DARK}`,
+                borderRadius: '4px',
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: '16px',
+                fontWeight: 700,
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+              }}
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   );
 }
 
 function SettingsRow({
   icon,
   label,
+  value,
   color = DARK,
   showChevron = false,
   borderTop = false,
@@ -348,6 +505,7 @@ function SettingsRow({
 }: {
   icon: React.ReactNode;
   label: string;
+  value?: string;
   color?: string;
   showChevron?: boolean;
   borderTop?: boolean;
@@ -382,7 +540,21 @@ function SettingsRow({
           {label}
         </span>
       </div>
-      {showChevron && <ChevronRight color={DARK} />}
+      
+      {/* Right side: value or chevron */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {value && (
+          <span style={{
+            fontFamily: "'Inter', sans-serif",
+            fontWeight: 600,
+            fontSize: isMobile ? '11px' : '13px',
+            color: '#666',
+          }}>
+            {value}
+          </span>
+        )}
+        {showChevron && <ChevronRight color={DARK} />}
+      </div>
     </div>
   );
 }

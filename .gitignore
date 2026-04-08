@@ -1,7 +1,12 @@
 .agent
 .agents
 node_modules
-.env-e 
+
 # Environment files
-*.env
-*.env.*
+.env
+.env.local
+.env.*.local
+
+# But keep the template environment files
+!.env.development
+!.env.production

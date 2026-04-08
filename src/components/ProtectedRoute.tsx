@@ -1,45 +1,19 @@
-import { Navigate } from 'react-router-dom';
+import { Navigate, Outlet } from 'react-router-dom';
+import PageLoader from './PageLoader';
 import { useAuthStore } from '../stores/authStore';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// ProtectedRoute
-// Wraps any page that requires authentication.
-// - While auth is loading → show a minimal loading screen
-// - If not authenticated → redirect to /login
-// - If authenticated → render children
-// ─────────────────────────────────────────────────────────────────────────────
+const ProtectedRoute = () => {
+  const user = useAuthStore(state => state.user);
+  const isLoading = useAuthStore(state => state.isLoading);
 
-interface Props {
-  children: React.ReactNode;
-}
+  // Still waiting for checkAuth to finish
+  if (isLoading) return <PageLoader />;
 
-export default function ProtectedRoute({ children }: Props) {
-  const { user, isLoading } = useAuthStore();
+  // checkAuth done, no user found → go to login
+  if (!user) return <Navigate to="/login" replace />;
 
-  if (isLoading) {
-    return (
-      <div
-        style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          height: '100vh',
-          background: '#F2F2F2',
-          fontFamily: "'Space Grotesk', sans-serif",
-          fontSize: '14px',
-          color: 'rgba(26,26,26,0.4)',
-          letterSpacing: '0.1em',
-          textTransform: 'uppercase',
-        }}
-      >
-        Loading…
-      </div>
-    );
-  }
+  // checkAuth done, user found → render the page
+  return <Outlet />;
+};
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <>{children}</>;
-}
+export default ProtectedRoute;

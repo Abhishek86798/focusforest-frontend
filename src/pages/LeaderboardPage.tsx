@@ -2,11 +2,13 @@
  * LeaderboardPage — Responsive implementation
  */
 
-import { useState } from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import Sidebar from '../components/Sidebar';
 import MobileBottomNav from '../components/MobileBottomNav';
 import { useIsMobile } from '../hooks/useIsMobile';
+import { useLeaderboard } from '../hooks/useForestData';
+import { useAuthStore } from '../stores/authStore';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const BG         = '#F2F2F2';
@@ -15,19 +17,23 @@ const GREEN      = '#006D37';
 const DARK       = '#1A1A1A';
 const SHADOW     = '4px 4px 0px 0px rgba(26, 26, 26, 1)';
 
-// ─── Static data ───────────────────────────────────────────────────────────────
-const PODIUM = [
-  { place: 2, name: 'Elena V.',      trees: '120 Trees', green: false, barH: 140, barHMobile: 100, badgeSize: 80  },
-  { place: 1, name: 'Marcus Thorne', trees: '120 Trees', green: true,  barH: 192, barHMobile: 140, badgeSize: 112 },
-  { place: 3, name: 'Julian K.',     trees: '120 Trees', green: false, barH: 112, barHMobile: 80, badgeSize: 80  },
-];
+export interface PodiumEntry {
+  place: number;
+  name: string;
+  trees: string;
+  green: boolean;
+  barH: number;
+  barHMobile: number;
+  badgeSize: number;
+}
 
-const ROWS = [
-  { rank: '04', name: 'Sarah Jenkins', trees: '112 Trees', streak: 8,  isMe: false },
-  { rank: '05', name: 'Alex Mercer',   trees: '98 Trees',  streak: 12, isMe: true  },
-  { rank: '06', name: 'David Chen',    trees: '84 Trees',  streak: 4,  isMe: false },
-  { rank: '07', name: 'Amara Okafor', trees: '77 Trees',  streak: 15, isMe: false },
-];
+export interface RowEntry {
+  rank: string;
+  name: string;
+  trees: string;
+  streak?: number;
+  isMe: boolean;
+}
 
 // ─── AvatarBadge ───────────────────────────────────────────────────────────────
 function AvatarBadge({ place, green, isMobile }: { place: number; green: boolean; isMobile: boolean }) {
@@ -78,7 +84,7 @@ function AvatarBadge({ place, green, isMobile }: { place: number; green: boolean
 }
 
 // ─── Podium ────────────────────────────────────────────────────────────────────
-function Podium({ isMobile }: { isMobile: boolean }) {
+function Podium({ isMobile, podiumData }: { isMobile: boolean; podiumData: PodiumEntry[] }) {
   return (
     <div style={{
       display: 'flex',
@@ -88,7 +94,7 @@ function Podium({ isMobile }: { isMobile: boolean }) {
       width: '100%',
       boxSizing: 'border-box',
     }}>
-      {PODIUM.map((p, i) => (
+      {podiumData.map((p, i) => (
         <motion.div
           key={p.place}
           initial={{ opacity: 0, y: 24 }}
@@ -159,7 +165,21 @@ function Podium({ isMobile }: { isMobile: boolean }) {
 }
 
 // ─── Ranking table ─────────────────────────────────────────────────────────────
-function RankingTable({ isMobile }: { isMobile: boolean }) {
+function RankingTable({ 
+  isMobile, 
+  rowsData, 
+  isGroupMode, 
+  onLoadMore, 
+  hasMore, 
+  isLoadingMore 
+}: { 
+  isMobile: boolean; 
+  rowsData: RowEntry[]; 
+  isGroupMode: boolean;
+  onLoadMore: () => void;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+}) {
   const COL_GRID = isMobile ? '40px 1fr 80px' : '95px 1fr 220px 160px';
 
   return (
@@ -217,17 +237,17 @@ function RankingTable({ isMobile }: { isMobile: boolean }) {
             letterSpacing: '0.1em',
             color: DARK,
             textAlign: 'right',
-          }}>Current Streak</span>
+          }}>{isGroupMode ? 'Members' : 'Current Streak'}</span>
         )}
       </div>
 
       {/* Data rows */}
-      {ROWS.map((row, i) => (
-        <RankRow key={row.rank} row={row} index={i} isLast={i === ROWS.length - 1} isMobile={isMobile} />
+      {rowsData.map((row, i) => (
+        <RankRow key={`${row.rank}-${row.name}`} row={row} index={i} isLast={i === rowsData.length - 1} isMobile={isMobile} />
       ))}
 
       {/* Show more */}
-      <ShowMoreRow isMobile={isMobile} />
+      <ShowMoreRow isMobile={isMobile} onLoadMore={onLoadMore} hasMore={hasMore} isLoading={isLoadingMore} />
     </div>
   );
 }
@@ -235,7 +255,7 @@ function RankingTable({ isMobile }: { isMobile: boolean }) {
 function RankRow({
   row, index, isLast, isMobile,
 }: {
-  row: typeof ROWS[0];
+  row: RowEntry;
   index: number;
   isLast: boolean;
   isMobile: boolean;
@@ -345,11 +365,17 @@ function RankRow({
   );
 }
 
-function ShowMoreRow({ isMobile }: { isMobile: boolean }) {
-  const [open, setOpen] = useState(false);
+function ShowMoreRow({ isMobile, onLoadMore, hasMore, isLoading }: { 
+  isMobile: boolean; 
+  onLoadMore: () => void;
+  hasMore: boolean;
+  isLoading: boolean;
+}) {
+  if (!hasMore) return null;
+  
   return (
     <div
-      onClick={() => setOpen(v => !v)}
+      onClick={onLoadMore}
       style={{
         display: 'flex',
         justifyContent: 'center',
@@ -357,8 +383,8 @@ function ShowMoreRow({ isMobile }: { isMobile: boolean }) {
         gap: 8,
         padding: isMobile ? '20px 0' : '32px 0',
         borderTop: '1px solid rgba(26,26,26,0.08)',
-        cursor: 'pointer',
-        opacity: 0.4,
+        cursor: isLoading ? 'wait' : 'pointer',
+        opacity: isLoading ? 0.3 : 0.4,
         transition: 'opacity 0.18s',
         userSelect: 'none',
       }}
@@ -371,14 +397,16 @@ function ShowMoreRow({ isMobile }: { isMobile: boolean }) {
         letterSpacing: '0.2em',
         color: DARK,
       }}>
-        {open ? 'Show less' : 'Show more'}
+        {isLoading ? 'Loading...' : 'Load more'}
       </span>
-      <svg
-        width="10" height="7" viewBox="0 0 10 7" fill="none"
-        style={{ transform: open ? 'rotate(180deg)' : 'none', transition: 'transform 0.2s' }}
-      >
-        <path d="M1 1.5L5 5.5L9 1.5" stroke={DARK} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
-      </svg>
+      {!isLoading && (
+        <svg
+          width="10" height="7" viewBox="0 0 10 7" fill="none"
+          style={{ transition: 'transform 0.2s' }}
+        >
+          <path d="M1 1.5L5 5.5L9 1.5" stroke={DARK} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+        </svg>
+      )}
     </div>
   );
 }
@@ -450,7 +478,88 @@ function CategoryToggle({
 // ─── Page ──────────────────────────────────────────────────────────────────────
 export default function LeaderboardPage() {
   const [category, setCategory] = useState<'solo' | 'groups'>('solo');
+  const [page, setPage] = useState(1);
+  const [allEntries, setAllEntries] = useState<any[]>([]);
   const isMobile = useIsMobile();
+  const user = useAuthStore(s => s.user);
+  const lastProcessedPage = React.useRef(0);
+
+  // Fetch leaderboard data
+  const { data: leaderboardData, isLoading } = useLeaderboard(category, 'global', page);
+  const entries = leaderboardData?.entries || [];
+  const total = leaderboardData?.total || 0;
+
+  // Accumulate entries when page changes
+  React.useEffect(() => {
+    // Only process if we have new data and haven't processed this page yet
+    if (entries.length === 0 || lastProcessedPage.current === page) return;
+    
+    lastProcessedPage.current = page;
+    
+    if (page === 1) {
+      setAllEntries(entries);
+    } else {
+      setAllEntries(prev => [...prev, ...entries]);
+    }
+  }, [entries, page]);
+
+  // Reset when category changes
+  const handleCategoryChange = (newCategory: 'solo' | 'groups') => {
+    setCategory(newCategory);
+    setPage(1);
+    setAllEntries([]);
+    lastProcessedPage.current = 0; // Reset the ref
+  };
+
+  // Load more handler
+  const handleLoadMore = () => {
+    if (!isLoading && allEntries.length < total) {
+      setPage(p => p + 1);
+    }
+  };
+
+  const hasMore = allEntries.length < total;
+  const displayEntries = allEntries.length > 0 ? allEntries : entries;
+
+  // Podium data (top 3)
+  const podiumRaw = displayEntries.slice(0, 3);
+  const p1 = podiumRaw[0];
+  const p2 = podiumRaw[1];
+  const p3 = podiumRaw[2];
+  
+  const podiumData: PodiumEntry[] = [
+    {
+      place: 2,
+      name: p2 ? (category === 'solo' ? p2.name : p2.name) : '---',
+      trees: p2 ? `${p2.totalTrees} Trees` : '0 Trees',
+      green: false,
+      barH: 140, barHMobile: 100, badgeSize: 80
+    },
+    {
+      place: 1,
+      name: p1 ? (category === 'solo' ? p1.name : p1.name) : '---',
+      trees: p1 ? `${p1.totalTrees} Trees` : '0 Trees',
+      green: true,
+      barH: 192, barHMobile: 140, badgeSize: 112
+    },
+    {
+      place: 3,
+      name: p3 ? (category === 'solo' ? p3.name : p3.name) : '---',
+      trees: p3 ? `${p3.totalTrees} Trees` : '0 Trees',
+      green: false,
+      barH: 112, barHMobile: 80, badgeSize: 80
+    }
+  ];
+
+  // Rows data (rank 4+)
+  const rowsRaw = displayEntries.slice(3);
+  const rowsData: RowEntry[] = rowsRaw.map((entry: any) => ({
+    rank: entry.rank.toString().padStart(2, '0'),
+    name: entry.name,
+    trees: `${entry.totalTrees} Trees`,
+    streak: category === 'solo' ? entry.currentStreak : entry.memberCount,
+    isMe: category === 'solo' && user ? entry.userId === user.id : false,
+  }));
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: BG }}>
@@ -493,11 +602,12 @@ export default function LeaderboardPage() {
           paddingTop: isMobile ? 24 : 60,
           paddingBottom: isMobile ? 24 : 48,
         }}>
-          <CategoryToggle active={category} onChange={setCategory} isMobile={isMobile} />
+          <CategoryToggle active={category} onChange={handleCategoryChange} isMobile={isMobile} />
         </div>
 
         {/* Podium */}
         <motion.div
+          key={`podium-${category}`}
           initial={{ opacity: 0, y: 16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
@@ -506,24 +616,42 @@ export default function LeaderboardPage() {
             paddingRight: isMobile ? '16px' : '6.5%',
           }}
         >
-          <Podium isMobile={isMobile} />
+          {isLoading && page === 1 ? (
+            <div style={{ textAlign: 'center', opacity: 0.5, padding: '40px 0' }}>Loading...</div>
+          ) : displayEntries.length > 0 ? (
+            <Podium isMobile={isMobile} podiumData={podiumData} />
+          ) : (
+            <div style={{ textAlign: 'center', opacity: 0.5, padding: '40px 0' }}>
+              No entries yet
+            </div>
+          )}
         </motion.div>
 
         {/* Gap */}
         <div style={{ height: isMobile ? 32 : 88 }} />
 
         {/* Ranking table */}
-        <motion.div
-          initial={{ opacity: 0, y: 16 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2, duration: 0.4 }}
-          style={{
-            paddingLeft: isMobile ? '16px' : '7.5%',
-            paddingRight: isMobile ? '16px' : '7.5%',
-          }}
-        >
-          <RankingTable isMobile={isMobile} />
-        </motion.div>
+        {displayEntries.length > 3 && (
+          <motion.div
+            key={`table-${category}`}
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.2, duration: 0.4 }}
+            style={{
+              paddingLeft: isMobile ? '16px' : '7.5%',
+              paddingRight: isMobile ? '16px' : '7.5%',
+            }}
+          >
+            <RankingTable 
+              isMobile={isMobile} 
+              rowsData={rowsData} 
+              isGroupMode={category === 'groups'}
+              onLoadMore={handleLoadMore}
+              hasMore={hasMore}
+              isLoadingMore={isLoading && page > 1}
+            />
+          </motion.div>
+        )}
 
         <div style={{ height: isMobile ? 24 : 60 }} />
       </main>

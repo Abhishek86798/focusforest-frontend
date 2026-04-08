@@ -8,8 +8,19 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { sessionApi } from '../api';
 import { CreateSessionBody } from '../types';
 import { useSessionStore } from '../stores/sessionStore';
+import { useTreeToday, useSessions, useWeekData, useStatsSummary } from '../hooks/useForestData';
+import { getCurrentWeekId } from '../utils';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
+
+// Variant display names
+const VARIANT_DISPLAY = {
+  sprint: 'Silver Birch',
+  classic: 'Bonsai',
+  deep_work: 'Ancient Pine',
+  flow: 'Cedar Tree',
+  custom: 'Custom',
+} as const;
 
 // Number of pomodoro slots to display as progress dots
 const TOTAL_SESSIONS = 4;
@@ -98,6 +109,124 @@ function SessionPopup({ task, onAction }: { task: string; onAction: (status: 'co
   );
 }
 
+// Session History Table Component
+function SessionHistory({ sessions }: { sessions: any[] }) {
+  if (sessions.length === 0) return null;
+
+  const getOutcomeBadge = (taskStatus: string) => {
+    switch (taskStatus) {
+      case 'completed':
+        return (
+          <span style={{
+            padding: '4px 12px',
+            borderRadius: '4px',
+            background: 'rgba(0,109,55,0.1)',
+            color: '#006D37',
+            fontSize: '12px',
+            fontWeight: 600,
+            fontFamily: "'Inter', sans-serif",
+          }}>
+            SUCCESS
+          </span>
+        );
+      case 'carried':
+        return (
+          <span style={{
+            padding: '4px 12px',
+            borderRadius: '4px',
+            background: 'rgba(220,38,38,0.1)',
+            color: '#DC2626',
+            fontSize: '12px',
+            fontWeight: 600,
+            fontFamily: "'Inter', sans-serif",
+          }}>
+            WITHERED
+          </span>
+        );
+      default:
+        return (
+          <span style={{
+            padding: '4px 12px',
+            borderRadius: '4px',
+            background: 'rgba(0,0,0,0.05)',
+            color: '#666',
+            fontSize: '12px',
+            fontWeight: 600,
+            fontFamily: "'Inter', sans-serif",
+          }}>
+            NO TASK
+          </span>
+        );
+    }
+  };
+
+  const formatDate = (dateStr: string) => {
+    const date = new Date(dateStr);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  return (
+    <div style={{
+      width: '100%',
+      maxWidth: '900px',
+      margin: '0 auto',
+      padding: '0 40px 40px',
+    }}>
+      <h3 style={{
+        fontFamily: "'Space Grotesk', sans-serif",
+        fontWeight: 700,
+        fontSize: '18px',
+        color: '#1A1A1A',
+        marginBottom: '16px',
+      }}>
+        Recent Sessions
+      </h3>
+      <div style={{
+        background: '#FAFAFA',
+        border: '1px solid #E8E8E8',
+        borderRadius: '8px',
+        overflow: 'hidden',
+      }}>
+        <table style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+        }}>
+          <thead>
+            <tr style={{ background: '#F2F2F2' }}>
+              <th style={{ padding: '12px 16px', textAlign: 'left', fontFamily: "'Inter', sans-serif", fontSize: '12px', fontWeight: 600, color: '#666', textTransform: 'uppercase' }}>Date</th>
+              <th style={{ padding: '12px 16px', textAlign: 'left', fontFamily: "'Inter', sans-serif", fontSize: '12px', fontWeight: 600, color: '#666', textTransform: 'uppercase' }}>Variant</th>
+              <th style={{ padding: '12px 16px', textAlign: 'left', fontFamily: "'Inter', sans-serif", fontSize: '12px', fontWeight: 600, color: '#666', textTransform: 'uppercase' }}>Duration</th>
+              <th style={{ padding: '12px 16px', textAlign: 'left', fontFamily: "'Inter', sans-serif", fontSize: '12px', fontWeight: 600, color: '#666', textTransform: 'uppercase' }}>Task</th>
+              <th style={{ padding: '12px 16px', textAlign: 'left', fontFamily: "'Inter', sans-serif", fontSize: '12px', fontWeight: 600, color: '#666', textTransform: 'uppercase' }}>Outcome</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sessions.map((session, idx) => (
+              <tr key={session.id} style={{ borderTop: idx > 0 ? '1px solid #E8E8E8' : 'none' }}>
+                <td style={{ padding: '12px 16px', fontFamily: "'Inter', sans-serif", fontSize: '14px', color: '#1A1A1A' }}>
+                  {formatDate(session.createdAt)}
+                </td>
+                <td style={{ padding: '12px 16px', fontFamily: "'Inter', sans-serif", fontSize: '14px', color: '#1A1A1A' }}>
+                  {VARIANT_DISPLAY[session.variant as keyof typeof VARIANT_DISPLAY] || session.variant}
+                </td>
+                <td style={{ padding: '12px 16px', fontFamily: "'Inter', sans-serif", fontSize: '14px', color: '#1A1A1A' }}>
+                  {session.focusMinutes} min
+                </td>
+                <td style={{ padding: '12px 16px', fontFamily: "'Inter', sans-serif", fontSize: '14px', color: '#666', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {session.taskText || '—'}
+                </td>
+                <td style={{ padding: '12px 16px' }}>
+                  {getOutcomeBadge(session.taskStatus)}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -105,6 +234,18 @@ export default function DashboardPage() {
   const user = useAuthStore(s => s.user);
   const currentStreak = user?.currentStreak || 0;
   const queryClient = useQueryClient();
+
+  // Fetch today's tree and recent sessions
+  const { data: treeToday } = useTreeToday();
+  const { data: sessionsData } = useSessions();
+  const recentSessions = sessionsData?.sessions.slice(0, 5) || [];
+
+  // Fetch current week data
+  const currentWeekId = getCurrentWeekId();
+  const { data: weekData } = useWeekData(currentWeekId);
+
+  // Fetch stats summary
+  const { data: stats } = useStatsSummary();
 
   const isMobile = useIsMobile();
   const { selectedVariant, customFocusMinutes, alwaysUseVariant } = useSessionStore();
@@ -153,7 +294,7 @@ export default function DashboardPage() {
   const sessionMutation = useMutation({
     mutationFn: sessionApi.create,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tree'] });
+      queryClient.invalidateQueries({ queryKey: ['trees'] });
       queryClient.invalidateQueries({ queryKey: ['sessions'] });
       useAuthStore.getState().checkAuth();
     },
@@ -1116,6 +1257,139 @@ export default function DashboardPage() {
           </div>
         </header>
 
+        {/* Week View */}
+        <section
+          style={{
+            padding: '24px 40px 0',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{
+            display: 'flex',
+            flexDirection: 'row',
+            gap: '12px',
+            justifyContent: 'center',
+            maxWidth: '900px',
+            margin: '0 auto',
+          }}>
+            {weekData?.days.map((day) => {
+              const isToday = day.date === new Date().toISOString().split('T')[0];
+              const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(day.date).getDay()];
+              
+              // Display logic:
+              // - stage 0 + isBare false → seed icon (today, no sessions yet)
+              // - stage 0 + isBare true → empty dashed border (missed day)
+              // - stage 1-4 → tree emoji for that stage
+              const showEmpty = day.stage === 0 && day.isBare;
+              const treeEmoji = ['🌰', '🌱', '🌿', '🌳', '🌲'][day.stage];
+
+              return (
+                <div
+                  key={day.date}
+                  style={{
+                    flex: 1,
+                    minWidth: '80px',
+                    maxWidth: '120px',
+                    height: '100px',
+                    background: isToday ? '#006D37' : '#FAFAFA',
+                    border: showEmpty ? '2px dashed #C4C4C4' : '1px solid #E8E8E8',
+                    borderRadius: '12px',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'transform 0.2s',
+                    cursor: 'default',
+                  }}
+                >
+                  <span style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: '12px',
+                    fontWeight: 600,
+                    color: isToday ? '#FAFAFA' : '#666',
+                  }}>
+                    {dayOfWeek}
+                  </span>
+                  <span style={{
+                    fontSize: showEmpty ? '24px' : '32px',
+                    lineHeight: 1,
+                  }}>
+                    {showEmpty ? '' : treeEmoji}
+                  </span>
+                  <span style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: '11px',
+                    color: isToday ? '#FAFAFA' : '#999',
+                  }}>
+                    {new Date(day.date).getDate()}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+
+        {/* Stat Cards */}
+        <section
+          style={{
+            padding: '24px 40px 0',
+            flexShrink: 0,
+          }}
+        >
+          <div style={{
+            display: 'grid',
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '16px',
+            maxWidth: '900px',
+            margin: '0 auto',
+          }}>
+            {[
+              { label: 'Total Minutes', value: stats?.totalMinutes ?? '--', icon: '⏱️' },
+              { label: 'Trees Completed', value: stats?.treesCompleted ?? '--', icon: '🌲' },
+              { label: 'Sessions', value: stats?.sessions ?? '--', icon: '🎯' },
+              { label: 'Task Completion', value: stats ? `${Math.round(stats.taskCompletionRate * 100)}%` : '--', icon: '✅' },
+            ].map((stat, idx) => (
+              <div
+                key={idx}
+                style={{
+                  background: '#FAFAFA',
+                  border: '1px solid #E8E8E8',
+                  borderRadius: '12px',
+                  padding: '20px',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '8px',
+                }}
+              >
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                }}>
+                  <span style={{ fontSize: '20px' }}>{stat.icon}</span>
+                  <span style={{
+                    fontFamily: "'Inter', sans-serif",
+                    fontSize: '13px',
+                    color: '#666',
+                    fontWeight: 500,
+                  }}>
+                    {stat.label}
+                  </span>
+                </div>
+                <span style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: '28px',
+                  fontWeight: 700,
+                  color: '#1A1A1A',
+                }}>
+                  {stat.value}
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+
         {/* Hero section */}
         <section
           style={{
@@ -1129,6 +1403,28 @@ export default function DashboardPage() {
             overflow: 'hidden',
           }}
         >
+          {/* Today's Tree Status */}
+          {treeToday && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '12px',
+              padding: '12px 20px',
+              background: 'rgba(0,109,55,0.08)',
+              borderRadius: '8px',
+              border: '1px solid rgba(0,109,55,0.2)',
+            }}>
+              <span style={{
+                fontFamily: "'Inter', sans-serif",
+                fontSize: '14px',
+                color: '#006D37',
+                fontWeight: 500,
+              }}>
+                Today's Tree: Stage {treeToday.stage} • {treeToday.totalSessions} session{treeToday.totalSessions !== 1 ? 's' : ''}
+              </span>
+            </div>
+          )}
+
           {/* Timer + Tree row */}
           <div
             style={{
@@ -1327,6 +1623,9 @@ export default function DashboardPage() {
             </button>
           </div>
         </section>
+
+        {/* Session History */}
+        <SessionHistory sessions={recentSessions} />
       </main>
 
       {showSessionPopup && <SessionPopup task={task} onAction={handlePopupComplete} />}

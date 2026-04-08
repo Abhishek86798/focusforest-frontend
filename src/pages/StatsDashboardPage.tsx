@@ -13,7 +13,17 @@ const SHADOW = `4px 4px 0px 0px ${DARK}`;
 
 // ─── Data ─────────────────────────────────────────────────────────────────────
 
-const DAYS = [
+type Outcome = 'SUCCESS' | 'WITHERED';
+type DayState = 'filled' | 'today' | 'future';
+
+export interface DayData {
+  key: string;
+  state: DayState;
+  trees: number;
+}
+
+// Simple mock of DAYS since weekly trees API isn't fully integrated yet
+const DAYS: DayData[] = [
   { key: 'MON', state: 'filled', trees: 2 },
   { key: 'TUE', state: 'filled', trees: 1 },
   { key: 'WED', state: 'today', trees: 1 },
@@ -21,23 +31,6 @@ const DAYS = [
   { key: 'FRI', state: 'future', trees: 0 },
   { key: 'SAT', state: 'future', trees: 0 },
   { key: 'SUN', state: 'future', trees: 0 },
-];
-
-type Outcome = 'SUCCESS' | 'WITHERED';
-
-interface SessionRow {
-  date: string;
-  variant: string;
-  duration: string;
-  task: string;
-  outcome: Outcome;
-}
-
-const SESSIONS: SessionRow[] = [
-  { date: 'Oct 24', variant: 'Ancient Pine', duration: '45m', task: 'Q4 Planning', outcome: 'SUCCESS' },
-  { date: 'Oct 24', variant: 'Bonsai', duration: '25m', task: 'Email Inbox', outcome: 'SUCCESS' },
-  { date: 'Oct 23', variant: 'Silver Birch', duration: '12m', task: 'Deep Coding', outcome: 'WITHERED' },
-  { date: 'Oct 23', variant: 'Cedar Tree', duration: '60m', task: 'None', outcome: 'SUCCESS' },
 ];
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
@@ -91,7 +84,7 @@ function StatCard({
   );
 }
 
-function WeekDayCard({ day, isMobile }: { day: typeof DAYS[0]; isMobile: boolean }) {
+function WeekDayCard({ day, isMobile }: { day: DayData; isMobile: boolean }) {
   const isFuture = day.state === 'future';
   const isToday = day.state === 'today';
   const isFilled = day.state === 'filled';
@@ -175,11 +168,29 @@ function OutcomeBadge({ outcome, isMobile }: { outcome: Outcome; isMobile: boole
   );
 }
 
+import { useAuthStore } from '../stores/authStore';
+import { useSessions } from '../hooks/useForestData';
+import { getTreeForVariant } from '../utils/variantMapping';
+
 // ─── Main Page ────────────────────────────────────────────────────────────────
 
 export default function StatsDashboardPage() {
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const user = useAuthStore(s => s.user);
+
+  const { data: sessionsData } = useSessions();
+  const sessions = sessionsData?.sessions || [];
+  const currentStreak = user?.currentStreak || 0;
+
+  // Aggregate stats
+  const totalMinutes = sessions.reduce((acc, s) => acc + s.focusMinutes, 0);
+  const totalSessionsCount = sessions.length;
+  // Let outcome count be taskStatus == 'completed'
+  const sessionsWithTasks = sessions.filter(s => s.taskText);
+  const completedTaskCount = sessionsWithTasks.filter(s => s.taskStatus === 'completed').length;
+  const taskCompletionRate = sessionsWithTasks.length > 0 ? Math.round((completedTaskCount / sessionsWithTasks.length) * 100) : 0;
+  const treesCompleted = user?.totalTrees || 0;
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: BG }}>
@@ -273,7 +284,7 @@ export default function StatsDashboardPage() {
                   display: 'block',
                 }}
               >
-                12 DAY
+                {currentStreak} DAY
               </span>
               <span
                 style={{
@@ -302,10 +313,10 @@ export default function StatsDashboardPage() {
               gap: isMobile ? '12px' : '18px',
             }}
           >
-            <StatCard label="Total Minutes" value="450" isMobile={isMobile} />
-            <StatCard label="Sessions" value="18" isMobile={isMobile} />
-            <StatCard label="Trees Completed" value="12" isMobile={isMobile} />
-            <StatCard label="Task Completion" value="85%" highlighted isMobile={isMobile} />
+            <StatCard label="Total Minutes" value={totalMinutes.toString()} isMobile={isMobile} />
+            <StatCard label="Sessions" value={totalSessionsCount.toString()} isMobile={isMobile} />
+            <StatCard label="Trees Completed" value={treesCompleted.toString()} isMobile={isMobile} />
+            <StatCard label="Task Completion" value={`${taskCompletionRate}%`} highlighted isMobile={isMobile} />
           </div>
         </div>
 
@@ -416,39 +427,46 @@ export default function StatsDashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {SESSIONS.map((row, i) => (
-                  <tr
-                    key={i}
-                    style={{
-                      borderBottom: i < SESSIONS.length - 1 ? '1px solid #EEEEEE' : 'none',
-                      transition: 'background 0.15s',
-                    }}
-                  >
-                    {/* Date */}
-                    <td style={{ padding: isMobile ? '12px 4px' : '24px 8px 25px', fontWeight: 500, fontSize: isMobile ? '12px' : '14px', color: DARK }}>
-                      {row.date}
-                    </td>
-                    {/* Variant (with tree icon) */}
-                    <td style={{ padding: isMobile ? '12px 4px' : '20px 8px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px' }}>
-                        <TreeSvg size={isMobile ? 10 : 14} color={GREEN} />
-                        <span style={{ fontWeight: 500, fontSize: isMobile ? '11px' : '14px', color: DARK }}>{row.variant}</span>
-                      </div>
-                    </td>
-                    {/* Duration */}
-                    <td style={{ padding: isMobile ? '12px 4px' : '24.5px 8px', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? '12px' : '14px', color: DARK }}>
-                      {row.duration}
-                    </td>
-                    {/* Task */}
-                    <td style={{ padding: isMobile ? '12px 4px' : '24px 8px 25px', fontWeight: 500, fontSize: isMobile ? '11px' : '14px', color: DARK }}>
-                      {row.task}
-                    </td>
-                    {/* Outcome badge */}
-                    <td style={{ padding: isMobile ? '12px 4px' : '22px 8px 23px' }}>
-                      <OutcomeBadge outcome={row.outcome} isMobile={isMobile} />
-                    </td>
-                  </tr>
-                ))}
+                {sessions.map((row, i) => {
+                  const dateObj = new Date(row.createdAt);
+                  const dateStr = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                  const treeName = getTreeForVariant(row.variant).name;
+                  const outcome = row.taskStatus === 'completed' ? 'SUCCESS' : 'WITHERED'; // We're using WITHERED for non-completed right now
+
+                  return (
+                    <tr
+                      key={row.id || i}
+                      style={{
+                        borderBottom: i < sessions.length - 1 ? '1px solid #EEEEEE' : 'none',
+                        transition: 'background 0.15s',
+                      }}
+                    >
+                      {/* Date */}
+                      <td style={{ padding: isMobile ? '12px 4px' : '24px 8px 25px', fontWeight: 500, fontSize: isMobile ? '12px' : '14px', color: DARK }}>
+                        {dateStr}
+                      </td>
+                      {/* Variant (with tree icon) */}
+                      <td style={{ padding: isMobile ? '12px 4px' : '20px 8px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '4px' : '8px' }}>
+                          <TreeSvg size={isMobile ? 10 : 14} color={GREEN} />
+                          <span style={{ fontWeight: 500, fontSize: isMobile ? '11px' : '14px', color: DARK }}>{treeName}</span>
+                        </div>
+                      </td>
+                      {/* Duration */}
+                      <td style={{ padding: isMobile ? '12px 4px' : '24.5px 8px', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? '12px' : '14px', color: DARK }}>
+                        {row.focusMinutes}m
+                      </td>
+                      {/* Task */}
+                      <td style={{ padding: isMobile ? '12px 4px' : '24px 8px 25px', fontWeight: 500, fontSize: isMobile ? '11px' : '14px', color: DARK }}>
+                        {row.taskText || 'None'}
+                      </td>
+                      {/* Outcome badge */}
+                      <td style={{ padding: isMobile ? '12px 4px' : '22px 8px 23px' }}>
+                        <OutcomeBadge outcome={outcome} isMobile={isMobile} />
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

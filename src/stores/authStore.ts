@@ -1,97 +1,71 @@
 import { create } from 'zustand';
-import { authApi } from '../api';
+import toast from 'react-hot-toast';
+import apiClient from '../api/client';
 import type { User } from '../types';
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Auth Store — manages authentication state globally
-// JWT lives in httpOnly cookie (handled by browser automatically).
-// This store only tracks the user object and loading state.
-// ─────────────────────────────────────────────────────────────────────────────
 
 interface AuthState {
   user: User | null;
   isLoading: boolean;
-  error: string | null;
-
-  /** Check auth status on app load — calls GET /auth/me */
   checkAuth: () => Promise<void>;
-
-  /** Log in with email + password */
   login: (email: string, password: string) => Promise<void>;
-
-  /** Sign up a new account */
-  signup: (name: string, email: string, password: string) => Promise<void>;
-
-  /** Log out — clears cookie via backend */
   logout: () => Promise<void>;
-
-  /** Clear any error message */
-  clearError: () => void;
+  signup: (email: string, password: string, name: string) => Promise<void>;
+  updateProfile: (data: { name?: string; avatarUrl?: string | null; isPrivate?: boolean }) => Promise<void>;
 }
+
+// Module-level flag — persists across renders, most reliable guard
+let authCheckComplete = false;
 
 export const useAuthStore = create<AuthState>((set) => ({
   user: null,
-  isLoading: true,   // true on first load — prevents flash of login redirect
-  error: null,
+  isLoading: true, // start true so ProtectedRoute shows loader initially
 
   checkAuth: async () => {
-    set({ isLoading: true, error: null });
-    const token = localStorage.getItem('accessToken');
-    if (!token) {
-      set({ user: null, isLoading: false });
-      return;
-    }
+    // If already ran, return immediately — no API call
+    if (authCheckComplete) return;
+    authCheckComplete = true; // set BEFORE the async call
+
     try {
-      const user = await authApi.me();
-      set({ user, isLoading: false });
-    } catch {
-      localStorage.removeItem('accessToken');
+      const response = await apiClient.get<User>('/auth/me');
+      set({ user: response.data, isLoading: false });
+    } catch (error: any) {
+      // 401 is normal — just means not logged in
       set({ user: null, isLoading: false });
     }
   },
 
-  login: async (email, password) => {
-    set({ isLoading: true, error: null });
-    try {
-      const { accessToken } = await authApi.login(email, password);
-      localStorage.setItem('accessToken', accessToken);
-      // After login, fetch the full user object
-      const user = await authApi.me();
-      set({ user, isLoading: false });
-    } catch (err: unknown) {
-      const message =
-        (err as { cleanMessage?: string }).cleanMessage ?? 'Login failed. Please try again.';
-      set({ error: message, isLoading: false });
-      throw err; // re-throw so form can handle it too
-    }
-  },
-
-  signup: async (name, email, password) => {
-    set({ isLoading: true, error: null });
-    try {
-      const utcOffset = new Date().getTimezoneOffset() * -1;
-      const { accessToken } = await authApi.signup({ name, email, password, utcOffset });
-      localStorage.setItem('accessToken', accessToken);
-      const user = await authApi.me();
-      set({ user, isLoading: false });
-    } catch (err: unknown) {
-      const message =
-        (err as { cleanMessage?: string }).cleanMessage ?? 'Signup failed. Please try again.';
-      set({ error: message, isLoading: false });
-      throw err;
-    }
+  login: async (email: string, password: string) => {
+    const response = await apiClient.post<{ user: User }>('/auth/login', {
+      email,
+      password,
+    });
+    // Set user from login response - no need to re-verify immediately
+    set({ user: response.data.user, isLoading: false });
   },
 
   logout: async () => {
-    try {
-      await authApi.logout();
-    } catch {
-      // Ignore errors on logout
-    } finally {
-      localStorage.removeItem('accessToken');
-      set({ user: null, isLoading: false, error: null });
-    }
+    await apiClient.post('/auth/logout');
+    authCheckComplete = false; // reset so next login triggers fresh check
+    set({ user: null, isLoading: true });
+    toast('Logged out');
   },
 
-  clearError: () => set({ error: null }),
+  signup: async (email: string, password: string, name: string) => {
+    const utcOffset = new Date().getTimezoneOffset() * -1;
+    const response = await apiClient.post<{ user: User }>('/auth/signup', {
+      email,
+      password,
+      name,
+      utcOffset,
+    });
+    // Set user from signup response - no need to re-verify immediately
+    set({ user: response.data.user, isLoading: false });
+  },
+
+  updateProfile: async (data: { name?: string; avatarUrl?: string | null; isPrivate?: boolean }) => {
+    const response = await apiClient.patch<User>('/auth/profile', data);
+    set({ user: response.data });
+    toast.success('Profile updated');
+  },
 }));
+

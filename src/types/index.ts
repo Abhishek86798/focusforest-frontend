@@ -13,6 +13,8 @@ export interface User {
   currentStreak: number;       // consecutive days with ≥1 session
   totalFocusMinutes: number;
   totalTrees: number;          // all-time completed trees (stage 4)
+  isPrivate: boolean;
+  createdAt: string;
 }
 
 // ── Tree & Calendar ────────────────────────────────────────────────────────────
@@ -29,6 +31,22 @@ export interface DailyTree {
   sessionsWithTask: number;
   isBare: boolean;             // true = day passed with zero sessions (missed day)
   finalisedAt: string | null;  // ISO datetime when day was locked in
+}
+
+export interface WeekData {
+  weekId: string;              // e.g. "2026-W14"
+  startDate: string;           // ISO date string
+  endDate: string;             // ISO date string
+  complete: boolean;           // true if all 7 days are finalized
+  days: DailyTree[];           // array of 7 day slots
+}
+
+// ── Stats ─────────────────────────────────────────────────────────────────────
+export interface StatsSummary {
+  totalMinutes: number;
+  treesCompleted: number;
+  sessions: number;
+  taskCompletionRate: number;  // 0.0–1.0 (e.g., 0.67 = 67%)
 }
 
 // ── Sessions ──────────────────────────────────────────────────────────────────
@@ -72,16 +90,46 @@ export interface Group {
   name: string;
   inviteCode: string;
   memberCount: number;
+  activeMemberCount?: number;
+  isAdmin?: boolean;
+  createdAt: string;
+}
+
+export interface GroupDetails {
+  id: string;
+  name: string;
+  inviteCode: string;
+  memberCount: number;
+  adminUserId: string;
   members: GroupMember[];
-  totalTrees: number;
+  forestStats: {
+    totalCompletedTrees: number;
+  };
+  createdAt: string;
 }
 
 export interface GroupMember {
   userId: string;
   name: string;
   avatarUrl: string | null;
-  totalTrees: number;
   currentStreak: number;
+  joinedAt: string;
+}
+
+export interface GroupStats {
+  totalMinutes: number;
+  treesCompleted: number;
+  sessions: number;
+  todayTreeCount: number;
+}
+
+export interface GroupMemberStatus {
+  userId: string;
+  name: string;
+  avatarUrl: string | null;
+  status: 'focus_session' | 'afk';
+  personalStreak: number;
+  contribution: number;
 }
 
 // ── Leaderboard ───────────────────────────────────────────────────────────────

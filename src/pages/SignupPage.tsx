@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { z } from 'zod';
@@ -40,10 +40,18 @@ function getStrength(pw: string): { label: string; color: string; pct: number } 
 
 export default function SignupPage() {
   const navigate = useNavigate();
-  const { signup, isLoading } = useAuthStore();
+  const signup = useAuthStore(state => state.signup);
+  const user = useAuthStore(state => state.user);
   const [serverError, setServerError] = useState<string | null>(null);
   const [showPw, setShowPw] = useState(false);
   const [pwValue, setPwValue] = useState('');
+
+  // Redirect if already authenticated
+  useEffect(() => {
+    if (user) {
+      navigate('/', { replace: true });
+    }
+  }, [user, navigate]);
 
   const utcOffset = detectUtcOffset();
   const tzLabel = `UTC ${formatUtcOffset(utcOffset)}`;
@@ -57,12 +65,14 @@ export default function SignupPage() {
   const onSubmit = async (data: FormData) => {
     setServerError(null);
     try {
-      await signup(data.name, data.email, data.password);
-      navigate('/dashboard', { replace: true });
-    } catch (err: unknown) {
-      const e = err as { response?: { status?: number } };
-      if (e.response?.status === 409) {
-        setServerError('This email is already registered. Sign in instead?');
+      await signup(data.email, data.password, data.name);
+      navigate('/', { replace: true });
+    } catch (err: any) {
+      if (err.response?.status === 409) {
+        setServerError('This email is already registered');
+      } else if (err.response?.status === 400) {
+        const message = err.response?.data?.message || 'Please check your inputs';
+        setServerError(message);
       } else {
         setServerError('Something went wrong. Please try again.');
       }
@@ -70,7 +80,7 @@ export default function SignupPage() {
   };
 
   const strength = getStrength(pwValue);
-  const busy = isSubmitting || isLoading;
+  const busy = isSubmitting;
 
   const inputStyle = (hasError: boolean) => ({
     width: '100%',
