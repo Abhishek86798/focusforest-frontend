@@ -1,9 +1,11 @@
 import axios from 'axios';
 import toast from 'react-hot-toast';
 
-// CRITICAL: Ensure withCredentials is true for ALL requests
+// CRITICAL: Use environment variable for baseURL
+// Development: Points directly to deployed backend
+// Production: Points to deployed backend
 const apiClient = axios.create({
-  baseURL: '/api/v1',
+  baseURL: import.meta.env.VITE_API_BASE_URL,
   withCredentials: true, // ✅ This sends cookies with every request
   headers: {
     'Content-Type': 'application/json',
@@ -18,23 +20,11 @@ apiClient.interceptors.request.use(
     const baseURL = config.baseURL || '';
     const fullURL = baseURL + url;
     
-    // Log ALL requests to see if they're going through proxy
+    // Log ALL requests to see where they're going
     console.log(`\n🌐 API Request: ${method} ${url}`);
     console.log('   baseURL:', baseURL);
     console.log('   Full URL:', fullURL);
     console.log('   withCredentials:', config.withCredentials);
-    
-    // Check if URL is absolute (bypassing proxy)
-    if (fullURL.startsWith('http://') || fullURL.startsWith('https://')) {
-      if (!fullURL.includes('localhost')) {
-        console.error('⚠️  WARNING: Request is going directly to external URL!');
-        console.error('   This will BYPASS the Vite proxy!');
-        console.error('   Cookies set on localhost will NOT be sent!');
-        console.error('   Fix: Change baseURL to relative path like "/api/v1"');
-      }
-    } else {
-      console.log('✅ Request is relative - will go through Vite proxy');
-    }
     
     return config;
   },
