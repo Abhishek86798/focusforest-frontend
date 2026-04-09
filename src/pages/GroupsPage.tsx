@@ -641,6 +641,8 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
   const { data: memberStatusData } = useGroupMemberStatus(groupId);
   const members = memberStatusData?.members || [];
   const isAdmin = groupDetails?.adminUserId === user?.id;
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [confirmLeave, setConfirmLeave] = useState(false);
 
   const deleteMutation = useMutation({
     mutationFn: groupApi.delete,
@@ -661,16 +663,25 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
 
   const handleDelete = () => {
     if (!groupId || !isAdmin) return;
-    if (confirm('Are you sure you want to delete this group? This action cannot be undone.')) {
-      deleteMutation.mutate(groupId);
+    if (!confirmDelete) {
+      setConfirmDelete(true);
+      // Reset after 3s if user doesn't confirm
+      setTimeout(() => setConfirmDelete(false), 3000);
+      return;
     }
+    setConfirmDelete(false);
+    deleteMutation.mutate(groupId);
   };
 
   const handleLeave = () => {
     if (!groupId || !user?.id) return;
-    if (confirm('Are you sure you want to leave this group?')) {
-      leaveMutation.mutate({ groupId, userId: user.id });
+    if (!confirmLeave) {
+      setConfirmLeave(true);
+      setTimeout(() => setConfirmLeave(false), 3000);
+      return;
     }
+    setConfirmLeave(false);
+    leaveMutation.mutate({ groupId, userId: user.id });
   };
 
   if (!groupId) {
@@ -735,16 +746,17 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
               fontSize: isMobile ? '10px' : '12px',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
-              color: DARK,
-              background: SUPERWHITE,
-              border: `1px solid ${DARK}`,
+              color: confirmDelete ? '#FAFAFA' : DARK,
+              background: confirmDelete ? '#DC2626' : SUPERWHITE,
+              border: `1px solid ${confirmDelete ? '#DC2626' : DARK}`,
               borderRadius: '2px',
               padding: isMobile ? '6px 12px' : '8px 16px',
               cursor: deleteMutation.isPending ? 'wait' : 'pointer',
               opacity: deleteMutation.isPending ? 0.5 : 1,
+              transition: 'background 0.2s, color 0.2s, border-color 0.2s',
             }}
           >
-            {deleteMutation.isPending ? 'Deleting...' : 'Delete Group'}
+            {deleteMutation.isPending ? 'Deleting...' : confirmDelete ? 'Tap again to confirm' : 'Delete Group'}
           </button>
         ) : (
           <button
@@ -756,16 +768,17 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
               fontSize: isMobile ? '10px' : '12px',
               textTransform: 'uppercase',
               letterSpacing: '0.05em',
-              color: '#DC2626',
-              background: SUPERWHITE,
+              color: confirmLeave ? '#FAFAFA' : '#DC2626',
+              background: confirmLeave ? '#DC2626' : SUPERWHITE,
               border: `1px solid #DC2626`,
               borderRadius: '2px',
               padding: isMobile ? '6px 12px' : '8px 16px',
               cursor: leaveMutation.isPending ? 'wait' : 'pointer',
               opacity: leaveMutation.isPending ? 0.5 : 1,
+              transition: 'background 0.2s, color 0.2s',
             }}
           >
-            {leaveMutation.isPending ? 'Leaving...' : 'Leave Group'}
+            {leaveMutation.isPending ? 'Leaving...' : confirmLeave ? 'Tap again to confirm' : 'Leave Group'}
           </button>
         )}
       </div>

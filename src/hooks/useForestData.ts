@@ -1,13 +1,13 @@
 import { useQuery } from '@tanstack/react-query';
-import { treeApi, sessionApi, leaderboardApi, statsApi, groupApi } from '../api';
+import { treeApi, sessionApi, leaderboardApi, statsApi, groupApi, preferencesApi } from '../api';
 
 /** Fetch today's live tree — auto-refreshes every 30 seconds during timer */
 export function useTreeToday() {
   return useQuery({
     queryKey: ['trees', 'today'],
     queryFn: treeApi.today,
-    staleTime: 30_000,    // 30 seconds
-    refetchInterval: 60_000, // background refresh every 1 minute
+    staleTime: 30_000,
+    refetchInterval: 60_000,
   });
 }
 
@@ -16,7 +16,7 @@ export function useTreeCalendar(month?: number, year?: number) {
   return useQuery({
     queryKey: ['trees', 'calendar', year, month],
     queryFn: () => treeApi.calendar(month, year),
-    staleTime: 5 * 60_000, // 5 minutes — calendar doesn't change often
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -25,15 +25,15 @@ export function useWeekData(weekId: string) {
   return useQuery({
     queryKey: ['trees', 'week', weekId],
     queryFn: () => treeApi.week(weekId),
-    staleTime: 60_000, // 1 minute
+    staleTime: 60_000,
   });
 }
 
-/** Fetch session history — optionally filtered by date range */
-export function useSessions(filters?: { startDate?: string; endDate?: string }) {
+/** Fetch session history — optionally filtered by date range and limit */
+export function useSessions(filters?: { startDate?: string; endDate?: string; limit?: number }) {
   return useQuery({
     queryKey: ['sessions', filters],
-    queryFn: () => sessionApi.list(filters?.startDate, filters?.endDate),
+    queryFn: () => sessionApi.list(filters?.startDate, filters?.endDate, filters?.limit),
     staleTime: 60_000,
   });
 }
@@ -64,8 +64,8 @@ export function useLeaderboard(
 ) {
   return useQuery({
     queryKey: ['leaderboard', type, scope, page],
-    queryFn: () => 
-      type === 'solo' 
+    queryFn: () =>
+      type === 'solo'
         ? leaderboardApi.solo(scope, page)
         : leaderboardApi.groups(scope, page) as any,
     staleTime: 60_000,
@@ -77,7 +77,28 @@ export function useStatsSummary() {
   return useQuery({
     queryKey: ['stats', 'summary'],
     queryFn: statsApi.summary,
-    staleTime: 60_000, // 1 minute
+    staleTime: 60_000,
+  });
+}
+
+/**
+ * Fetch current streak — always fresh from /stats/streak.
+ * Do NOT read streak from user.currentStreak in auth store — it is stale.
+ */
+export function useStreak() {
+  return useQuery({
+    queryKey: ['stats', 'streak'],
+    queryFn: statsApi.streak,
+    staleTime: 30_000,  // refresh more frequently — streak matters
+  });
+}
+
+/** Fetch user timer preferences (selectedVariant, lastTaskText) */
+export function useUserPreferences() {
+  return useQuery({
+    queryKey: ['user', 'preferences'],
+    queryFn: preferencesApi.get,
+    staleTime: 5 * 60_000,
   });
 }
 
@@ -88,7 +109,7 @@ export function useGroups() {
   return useQuery({
     queryKey: ['groups'],
     queryFn: groupApi.list,
-    staleTime: 30_000, // 30 seconds
+    staleTime: 30_000,
   });
 }
 
@@ -118,6 +139,7 @@ export function useGroupMemberStatus(groupId: string | null) {
     queryKey: ['group', groupId, 'status'],
     queryFn: () => groupApi.memberStatus(groupId!),
     enabled: !!groupId,
-    staleTime: 30_000, // 30 seconds - refresh frequently for live status
+    staleTime: 30_000,
+    refetchInterval: 30_000, // refresh every 30s for live member status
   });
 }

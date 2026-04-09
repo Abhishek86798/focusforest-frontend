@@ -558,7 +558,8 @@ export default function LeaderboardPage() {
     name: entry.name,
     trees: `${entry.totalTrees} Trees`,
     streak: category === 'solo' ? entry.currentStreak : entry.memberCount,
-    isMe: category === 'solo' && user ? entry.userId === user.id : false,
+    // Use server-provided isCurrentUser flag (most reliable)
+    isMe: category === 'solo' ? (entry.isCurrentUser ?? (user ? entry.userId === user.id : false)) : false,
   }));
 
   return (

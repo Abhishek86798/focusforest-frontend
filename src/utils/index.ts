@@ -74,13 +74,23 @@ export function todayISO(): string {
   return new Date().toISOString().split('T')[0];
 }
 
-/** Get current week ID in YYYY-Www format (e.g. "2026-W14") */
+/**
+ * Get current week ID in YYYY-Www format (e.g. "2026-W14").
+ * Uses ISO 8601: weeks start on Monday, Week 1 contains the first Thursday.
+ */
 export function getCurrentWeekId(): string {
-  const now = new Date();
-  const startOfYear = new Date(now.getFullYear(), 0, 1);
-  const days = Math.floor((now.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
-  const weekNumber = Math.ceil((days + startOfYear.getDay() + 1) / 7);
-  return `${now.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
+  const date = new Date();
+  // Copy date and set to nearest Thursday (ISO week anchor)
+  const thursday = new Date(date);
+  thursday.setDate(date.getDate() - ((date.getDay() + 6) % 7) + 3);
+  // Get Jan 4 of that year (always in Week 1 per ISO standard)
+  const jan4 = new Date(thursday.getFullYear(), 0, 4);
+  // Week number = floor((thursday - jan4Monday) / 7) + 1
+  const jan4Monday = new Date(jan4);
+  jan4Monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+  const weekNumber = Math.floor((thursday.getTime() - jan4Monday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+  const year = thursday.getFullYear();
+  return `${year}-W${String(weekNumber).padStart(2, '0')}`;
 }
 
 // ── String helpers ─────────────────────────────────────────────────────────────

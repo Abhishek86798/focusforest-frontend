@@ -31,6 +31,27 @@ export const authApi = {
 
   /** Log out — clears httpOnly cookie on backend */
   logout: () => apiClient.post('/auth/logout'),
+
+  /** Update user profile (name, isPrivate, utcOffset) */
+  updateProfile: (data: { name?: string; isPrivate?: boolean; utcOffset?: number }) =>
+    apiClient.patch<User>('/auth/profile', data).then(r => r.data),
+};
+
+// ── User Preferences ──────────────────────────────────────────────────────────
+
+export interface UserPreferences {
+  selectedVariant: string;
+  lastTaskText: string | null;
+}
+
+export const preferencesApi = {
+  /** Get user timer preferences */
+  get: () =>
+    apiClient.get<UserPreferences>('/user/preferences').then(r => r.data),
+
+  /** Update timer preference (selectedVariant, etc.) */
+  update: (data: Partial<UserPreferences>) =>
+    apiClient.patch<UserPreferences>('/user/preferences', data).then(r => r.data),
 };
 
 // ── Trees & Calendar ──────────────────────────────────────────────────────────
@@ -61,7 +82,7 @@ export const sessionApi = {
   complete: (sessionId: string, taskStatus: 'completed' | 'carried' | 'none') =>
     apiClient.post<CreateSessionResponse>(`/sessions/${sessionId}/complete`, { taskStatus }).then(r => r.data),
 
-  /** Abandon an active session */
+  /** Abandon an active session — POST /sessions/:id/abandon */
   abandon: (sessionId: string) =>
     apiClient.post<{ message: string }>(`/sessions/${sessionId}/abandon`).then(r => r.data),
 
@@ -69,10 +90,12 @@ export const sessionApi = {
   create: (body: CreateSessionBody) =>
     apiClient.post<CreateSessionResponse>('/sessions', body).then(r => r.data),
 
-  /** Get session history (optional date filter) */
-  list: (startDate?: string, endDate?: string) =>
+  /** Get session history (optional date filter + limit) */
+  list: (startDate?: string, endDate?: string, limit?: number) =>
     apiClient
-      .get<{ sessions: Session[]; total: number }>('/sessions', { params: { startDate, endDate } })
+      .get<{ sessions: Session[]; total: number }>('/sessions', {
+        params: { ...(startDate && { startDate }), ...(endDate && { endDate }), ...(limit && { limit }) },
+      })
       .then(r => r.data),
 };
 
@@ -142,8 +165,18 @@ export const leaderboardApi = {
 
 // ── Stats ─────────────────────────────────────────────────────────────────────
 
+export interface StreakData {
+  currentStreak: number;
+  longestStreak: number;
+  lastActiveDate: string | null;
+}
+
 export const statsApi = {
   /** Get user stats summary */
   summary: () =>
     apiClient.get<StatsSummary>('/stats/summary').then(r => r.data),
+
+  /** Get current streak data — always fresh, not from auth store */
+  streak: () =>
+    apiClient.get<StreakData>('/stats/streak').then(r => r.data),
 };

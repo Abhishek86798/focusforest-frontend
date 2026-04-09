@@ -166,32 +166,41 @@ function StatCard({ label, value, isMobile }: { label: string; value: string; is
 
 // ─── Monthly Efforts ────────────────────────────────────────────────────────────
 function MonthlyEfforts({ isMobile, currentMonth, currentYear }: { isMobile: boolean; currentMonth: number; currentYear: number }) {
-  // Calculate week IDs for current month
+  // Compute ISO 8601 week IDs for the current month
+  const getISOWeekId = (date: Date): string => {
+    const thursday = new Date(date);
+    thursday.setDate(date.getDate() - ((date.getDay() + 6) % 7) + 3);
+    const jan4 = new Date(thursday.getFullYear(), 0, 4);
+    const jan4Monday = new Date(jan4);
+    jan4Monday.setDate(jan4.getDate() - ((jan4.getDay() + 6) % 7));
+    const weekNumber = Math.floor((thursday.getTime() - jan4Monday.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
+    return `${thursday.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
+  };
+
   const getWeekIdsForMonth = (month: number, year: number): string[] => {
     const firstDay = new Date(year, month - 1, 1);
     const lastDay = new Date(year, month, 0);
-    
-    const getWeekId = (date: Date): string => {
-      const startOfYear = new Date(date.getFullYear(), 0, 1);
-      const days = Math.floor((date.getTime() - startOfYear.getTime()) / (24 * 60 * 60 * 1000));
-      const weekNumber = Math.ceil((days + startOfYear.getDay() + 1) / 7);
-      return `${date.getFullYear()}-W${String(weekNumber).padStart(2, '0')}`;
-    };
-    
     const weeks = new Set<string>();
     const current = new Date(firstDay);
     while (current <= lastDay) {
-      weeks.add(getWeekId(current));
+      weeks.add(getISOWeekId(current));
       current.setDate(current.getDate() + 7);
     }
-    
     return Array.from(weeks).sort();
   };
 
   const weekIds = getWeekIdsForMonth(currentMonth, currentYear);
   
-  // Fetch week data for each week
-  const weekQueries = weekIds.map(weekId => useWeekData(weekId));
+  // Fetch week data for each week — hooks must be called unconditionally at top level,
+  // so we call exactly 6 (max weeks in a month) and slice what we need
+  const w0 = useWeekData(weekIds[0] ?? '');
+  const w1 = useWeekData(weekIds[1] ?? '');
+  const w2 = useWeekData(weekIds[2] ?? '');
+  const w3 = useWeekData(weekIds[3] ?? '');
+  const w4 = useWeekData(weekIds[4] ?? '');
+  const w5 = useWeekData(weekIds[5] ?? '');
+  const weekQueries = [w0, w1, w2, w3, w4, w5].slice(0, weekIds.length);
+
   
   return (
     <div style={{

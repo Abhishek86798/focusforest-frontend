@@ -4,12 +4,14 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar';
 import MobileBottomNav from '../components/MobileBottomNav';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useAuthStore } from '../stores/authStore';
-import { useSessionStore } from '../stores/sessionStore';
-import { useStatsSummary, useWeekData } from '../hooks/useForestData';
+
+import { useStatsSummary, useWeekData, useStreak } from '../hooks/useForestData';
+import { preferencesApi } from '../api';
 import { getCurrentWeekId } from '../utils';
 import { VARIANT_CONFIGS, type SessionVariant } from '../types';
 
@@ -122,7 +124,6 @@ function ProfileHeader({ isMobile, userName }: { isMobile: boolean; userName: st
 // ─── Section: Stats Bento Grid ────────────────────────────────────────────────
 function StatsBentoGrid({ isMobile }: { isMobile: boolean }) {
   const { user } = useAuthStore();
-  const { lastStreak } = useSessionStore();
   const { data: stats } = useStatsSummary();
   const weekId = getCurrentWeekId();
   const { data: weekData } = useWeekData(weekId);
@@ -130,9 +131,9 @@ function StatsBentoGrid({ isMobile }: { isMobile: boolean }) {
   // Calculate trees this week (count days where stage === 4)
   const treesThisWeek = weekData?.days?.filter(day => day.stage === 4).length || 0;
 
-  // Use lastStreak from sessionStore (most recent from POST /sessions/:id/complete)
-  // Falls back to user.currentStreak from auth, or 0
-  const currentStreak = lastStreak ?? user?.currentStreak ?? 0;
+  // Use live streak from /stats/streak, not stale auth store value
+  const { data: streakApiData } = useStreak();
+  const currentStreak = streakApiData?.currentStreak ?? user?.currentStreak ?? 0;
 
   // Focus hours from stats (totalMinutes / 60)
   const focusHours = stats?.totalMinutes ? Math.round(stats.totalMinutes / 60) : '--';
@@ -316,10 +317,17 @@ function AccountDetails({ isMobile, onSignOut }: { isMobile: boolean; onSignOut:
   // Get timezone string
   const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
 
-  const handleVariantSelect = (variant: SessionVariant) => {
+  const handleVariantSelect = async (variant: SessionVariant) => {
     setSelectedVariant(variant);
     localStorage.setItem('focusforest_default_variant', variant);
     setShowVariantModal(false);
+    // Also persist to backend so it's available on any device/session
+    try {
+      await preferencesApi.update({ selectedVariant: variant });
+    } catch {
+      // Non-critical: localStorage already saved it
+      toast.error('Could not save variant preference to server.');
+    }
   };
 
   return (

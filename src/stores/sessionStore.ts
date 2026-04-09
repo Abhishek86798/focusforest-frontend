@@ -15,6 +15,7 @@ interface SessionState {
   
   // Task tracking
   taskText: string | null;
+  carryForwardTask: string | null;
   
   // Active session tracking
   sessionId: string | null;           // Server-assigned ID from /sessions/start
@@ -32,6 +33,7 @@ interface SessionState {
   setVariant: (variant: SessionVariant) => void;
   setCustomTimes: (focusMinutes: number, breakMinutes: number) => void;
   setTaskText: (text: string | null) => void;
+  setCarryForwardTask: (text: string | null) => void;
   setAlwaysUse: (value: boolean) => void;
   
   // Session lifecycle
@@ -53,6 +55,7 @@ export const useSessionStore = create<SessionState>((set) => ({
   
   // Task
   taskText: null,
+  carryForwardTask: null,
   
   // Active session
   sessionId: null,
@@ -73,6 +76,8 @@ export const useSessionStore = create<SessionState>((set) => ({
     set({ customFocusMinutes: focusMinutes, customBreakMinutes: breakMinutes }),
   
   setTaskText: (text) => set({ taskText: text }),
+  
+  setCarryForwardTask: (text) => set({ carryForwardTask: text }),
   
   setAlwaysUse: (value) => set({ alwaysUseVariant: value }),
   

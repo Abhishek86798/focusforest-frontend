@@ -143,7 +143,7 @@ export function useSessionLifecycle() {
    * 3. Navigate to home
    * 4. Invalidate queries
    */
-  const abandonSession = async (skipConfirm = false) => {
+  const abandonSession = async (skipConfirm = true) => {
     const { sessionId } = sessionStore;
 
     if (!sessionId) {
@@ -151,15 +151,10 @@ export function useSessionLifecycle() {
       return { success: false, error: 'No active session' };
     }
 
-    // Confirm with user
-    if (!skipConfirm) {
-      const confirmed = window.confirm(
-        'End session early? Your progress will be lost.'
-      );
-      if (!confirmed) {
-        return { success: false, cancelled: true };
-      }
-    }
+    // NOTE: Confirmation dialogs must be handled by the calling UI component
+    // (e.g. AbandonSessionModal) before invoking this hook.
+    // The skipConfirm param is kept for API compatibility but confirm() is removed.
+    void skipConfirm;
 
     try {
       // Call API

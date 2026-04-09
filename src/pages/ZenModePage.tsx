@@ -1,5 +1,6 @@
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
+import { useStatsSummary } from '../hooks/useForestData';
 import zenTreeImg from '../assets/zen_tree.png';
 
 // ─── Design tokens ────────────────────────────────────────────────────────────
@@ -88,6 +89,9 @@ function FloatingSvg({ variant, size, color = 'white' }: { variant: FloatItem['v
 // ─── Page ─────────────────────────────────────────────────────────────────────
 export default function ZenModePage() {
   const navigate = useNavigate();
+  const { data: stats } = useStatsSummary();
+  const totalSessions = stats?.sessions || 0;
+  
   // Inject keyframe animation + Escape to exit
   useEffect(() => {
     const style = document.createElement('style');
@@ -203,7 +207,7 @@ export default function ZenModePage() {
               display: 'block',
             }}
           >
-            you did 45 sessions
+            {totalSessions > 0 ? `you did ${totalSessions} sessions` : 'no sessions yet'}
           </span>
         </div>
 

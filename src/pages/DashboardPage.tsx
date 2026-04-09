@@ -4,12 +4,12 @@ import Sidebar from '../components/Sidebar';
 import MobileBottomNav from '../components/MobileBottomNav';
 import { useIsMobile } from '../hooks/useIsMobile';
 import { useAuthStore } from '../stores/authStore';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { sessionApi } from '../api';
-import { CreateSessionBody } from '../types';
 import { useSessionStore } from '../stores/sessionStore';
-import { useTreeToday, useSessions, useWeekData, useStatsSummary } from '../hooks/useForestData';
+import { useTreeToday, useSessions, useWeekData, useStatsSummary, useStreak } from '../hooks/useForestData';
 import { getCurrentWeekId } from '../utils';
+import toast from 'react-hot-toast';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -71,8 +71,9 @@ const MobileProfileIcon = ({ color = '#1A1A1A' }: { color?: string }) => (
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 import VariantPickerModal from '../components/VariantPickerModal';
+import AbandonSessionModal from '../components/AbandonSessionModal';
 
-function SessionPopup({ task, onAction }: { task: string; onAction: (status: 'completed' | 'carried' | 'none') => void }) {
+function SessionPopup({ task, onAction }: { task: string; onAction: (status: 'completed' | 'none') => void }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#1A1A1A]/80 backdrop-blur-sm px-4">
       <div className="bg-[#FAFAFA] rounded-[32px] w-full max-w-md p-10 flex flex-col items-center text-center shadow-2xl">
@@ -90,12 +91,6 @@ function SessionPopup({ task, onAction }: { task: string; onAction: (status: 'co
                 className="w-full h-[60px] bg-[#006D37] text-white rounded-[8px] font-['Inter'] font-bold text-[18px] shadow-lg transition-transform hover:-translate-y-1"
               >
                 ✅ Done (Complete)
-              </button>
-              <button
-                onClick={() => onAction('carried')}
-                className="w-full h-[60px] bg-[#FAFAFA] border-2 border-[#E8E8E8] text-[#1A1A1A] rounded-[8px] font-['Inter'] font-bold text-[18px] transition-colors hover:border-[#CCCCCC]"
-              >
-                ↩️ Carry Forward
               </button>
             </div>
           </>
@@ -232,7 +227,9 @@ function SessionHistory({ sessions }: { sessions: any[] }) {
 export default function DashboardPage() {
   const navigate = useNavigate();
   const user = useAuthStore(s => s.user);
-  const currentStreak = user?.currentStreak || 0;
+  // Always use live streak from API — user.currentStreak is stale (set at login)
+  const { data: streakData } = useStreak();
+  const currentStreak = streakData?.currentStreak ?? user?.currentStreak ?? 0;
   const queryClient = useQueryClient();
 
   // Fetch today's tree and recent sessions
@@ -248,12 +245,18 @@ export default function DashboardPage() {
   const { data: stats } = useStatsSummary();
 
   const isMobile = useIsMobile();
-  const { selectedVariant, customFocusMinutes, alwaysUseVariant } = useSessionStore();
+  const { 
+    selectedVariant, customFocusMinutes, alwaysUseVariant, 
+    sessionId, carryForwardTask, setCarryForwardTask,
+    startSession: storeStartSession, abandonSession: storeAbandonSession,
+    completeSession: storeCompleteSession,
+  } = useSessionStore();
   const customBreakMinutes = useSessionStore(s => (s as any).customBreakMinutes || 5);
 
   const [showVariantPicker, setShowVariantPicker] = useState(false);
   const [sessionPhase, setSessionPhase] = useState<'focus' | 'break' | 'longBreak'>('focus');
   const [showSessionPopup, setShowSessionPopup] = useState(false);
+  const [showAbandonModal, setShowAbandonModal] = useState(false);
 
   const getVariantSeconds = (v: string, phase: 'focus' | 'break' | 'longBreak') => {
     if (phase === 'longBreak') return 15 * 60;
@@ -286,22 +289,21 @@ export default function DashboardPage() {
 
   const [timeLeft, setTimeLeft] = useState(modeSeconds);
   const [running, setRunning] = useState(false);
-  const [task, setTask] = useState('');
+  const [task, setTask] = useState(carryForwardTask || '');
+
+  // Sync carryForwardTask into task input whenever it changes (e.g. after an abandon)
+  useEffect(() => {
+    if (carryForwardTask) {
+      setTask(carryForwardTask);
+    }
+  }, [carryForwardTask]);
+
   const [completedSessions, setCompletedSessions] = useState(0);
 
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const sessionMutation = useMutation({
-    mutationFn: sessionApi.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['trees'] });
-      queryClient.invalidateQueries({ queryKey: ['sessions'] });
-      useAuthStore.getState().checkAuth();
-    },
-    onError: (err) => {
-      console.error('Failed to log session', err);
-    }
-  });
+  // We are removing sessionMutation since we now explicitly use handleStartSessionFlow 
+  // and handlePopupComplete using sessionApi methods directly.
 
   const focusMode = running || sessionPhase !== 'focus' || (timeLeft < modeSeconds && timeLeft > 0);
 
@@ -344,37 +346,99 @@ export default function DashboardPage() {
     }
   }, [showSessionPopup, task]);
 
-  const handlePopupComplete = (status: 'completed' | 'carried' | 'none') => {
-    const body: CreateSessionBody = {
-      variant: selectedVariant,
-      focusMinutes: Math.floor(getVariantSeconds(selectedVariant, 'focus') / 60),
-      taskText: task || null,
-      taskStatus: status,
-      clientSessionId: crypto.randomUUID()
-    };
-    sessionMutation.mutate(body);
-    if (status === 'completed') setTask('');
+  const handlePopupComplete = async (status: 'completed' | 'none') => {
+    try {
+      if (sessionId) {
+        const res = await sessionApi.complete(sessionId, status);
+        // Update streak in react-query cache from the response
+        if (res?.streak?.currentStreak !== undefined) {
+          queryClient.setQueryData(['stats', 'streak'], (old: any) => ({
+            ...old,
+            currentStreak: res.streak.currentStreak,
+          }));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to complete session', err);
+      toast.error('Could not save session. Please try again.');
+    }
+
+    if (status === 'completed') {
+      setTask('');
+      setCarryForwardTask(null);
+    }
+    storeCompleteSession(streakData?.currentStreak ?? 0); // use correct store action
+
+    queryClient.invalidateQueries({ queryKey: ['trees'] });
+    queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    queryClient.invalidateQueries({ queryKey: ['stats'] });
+
     setShowSessionPopup(false);
     const is4thSession = completedSessions + 1 === TOTAL_SESSIONS;
     setSessionPhase(is4thSession ? 'longBreak' : 'break');
     setRunning(true);
   };
 
+
   const ringColor = sessionPhase === 'focus' ? '#006D37' : '#F9C74F';
+
+  const handleStartSessionFlow = async () => {
+    try {
+      const clientSessionId = crypto.randomUUID();
+      const focusMins = Math.floor(getVariantSeconds(selectedVariant, 'focus') / 60);
+
+      const res = await sessionApi.start({
+        variant: selectedVariant,
+        focusMinutes: focusMins,
+        taskText: task || null,
+        clientSessionId,
+      });
+
+      // Store sessionId BEFORE starting timer
+      storeStartSession(res.sessionId, clientSessionId, focusMins);
+      setRunning(true);
+    } catch (err) {
+      console.error('Failed to start session on backend', err);
+      toast.error('Could not start session. Check your connection.');
+    }
+  };
 
   const handleStart = () => {
     if (alwaysUseVariant) {
-      setRunning(true);
+      handleStartSessionFlow();
     } else {
       setShowVariantPicker(true);
     }
   };
 
-  const handleAbandon = () => {
-    if (!window.confirm('Are you sure you want to end this session completely?')) return;
+  const handleAbandonClick = () => {
+    setShowAbandonModal(true);
+  };
+
+  const executeAbandon = async (carryForward: boolean) => {
+    try {
+      if (sessionId) {
+        // POST /sessions/:id/abandon (not PATCH)
+        await sessionApi.abandon(sessionId);
+      }
+    } catch (err) {
+      console.error('Failed to abandon session', err);
+      toast.error('Could not abandon session. Please try again.');
+    }
+
+    if (carryForward && task) {
+      setCarryForwardTask(task);
+    } else {
+      setTask('');
+      setCarryForwardTask(null);
+    }
+
+    storeAbandonSession();
+    setShowAbandonModal(false);
     setRunning(false);
     setSessionPhase('focus');
-    setTimeLeft(modeSeconds);
+    setTimeLeft(getVariantSeconds(selectedVariant, 'focus'));
+    queryClient.invalidateQueries({ queryKey: ['sessions'] });
   };
 
   const idleProgress = timeLeft / modeSeconds;
@@ -665,12 +729,9 @@ export default function DashboardPage() {
             </span>
           </div>
 
-          {/* ── ABANDON SESSION (layout_SRJC3X / WYVTUX)
-                w=208 (fill), h=30.81
-                style_Y7CQBV: SG 700, 10.27px, UPPER, ls=23.37%
-          ── */}
+          {/* ── ABANDON SESSION (layout_SRJC3X / WYVTUX) ── */}
           <button
-            onClick={handleAbandon}
+            onClick={handleAbandonClick}
             style={{
               width:          208,
               height:         30.81,
@@ -698,12 +759,21 @@ export default function DashboardPage() {
 
         {showSessionPopup && <SessionPopup task={task} onAction={handlePopupComplete} />}
 
+        {showAbandonModal && (
+          <AbandonSessionModal
+            task={task || null}
+            onCarryForward={() => executeAbandon(true)}
+            onEndSession={() => executeAbandon(false)}
+            onClose={() => setShowAbandonModal(false)}
+          />
+        )}
+
         <VariantPickerModal
           isOpen={showVariantPicker}
           onClose={() => setShowVariantPicker(false)}
           onContinue={() => {
             setShowVariantPicker(false);
-            setRunning(true);
+            handleStartSessionFlow();
           }}
         />
       </div>
@@ -820,7 +890,7 @@ export default function DashboardPage() {
 
           {/* Abandon session */}
           <button
-            onClick={handleAbandon}
+            onClick={handleAbandonClick}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: 'clamp(13px, 1.3vw, 20px)', color: '#1A1A1A', textTransform: 'uppercase', letterSpacing: '2.4px', textDecoration: 'underline', textUnderlineOffset: '4px', padding: '8px 0', transition: 'opacity 0.2s, color 0.2s' }}
             onMouseEnter={e => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.color = '#CC2200'; }}
             onMouseLeave={e => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.color = '#1A1A1A'; }}
