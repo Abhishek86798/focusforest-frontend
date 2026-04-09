@@ -1,5 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useAuthStore } from './stores/authStore';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -90,8 +90,12 @@ function ErrorFallback() {
 
 // ── App ───────────────────────────────────────────────────────────────────────
 export default function App() {
+  const hasChecked = useRef(false);
+
   // Restore session from httpOnly cookie on app load - RUNS ONCE
   useEffect(() => {
+    if (hasChecked.current) return;
+    hasChecked.current = true;
     useAuthStore.getState().checkAuth();
   }, []); // empty array — runs ONCE on mount only
 

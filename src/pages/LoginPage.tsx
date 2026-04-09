@@ -46,8 +46,6 @@ export default function LoginPage() {
     setServerError(null);
     try {
       await login(data.email.trim(), data.password.trim());
-      // Small delay to ensure cookie is set before navigation
-      await new Promise(resolve => setTimeout(resolve, 100));
       navigate('/', { replace: true });
     } catch (err: any) {
       if (err.response?.status === 401) {

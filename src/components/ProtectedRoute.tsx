@@ -4,15 +4,15 @@ import { useAuthStore } from '../stores/authStore';
 
 const ProtectedRoute = () => {
   const user = useAuthStore(state => state.user);
-  const isLoading = useAuthStore(state => state.isLoading);
+  const isInitialized = useAuthStore(state => state.isInitialized);
 
-  // Still waiting for checkAuth to finish
-  if (isLoading) return <PageLoader />;
+  // Still waiting for initial auth check to finish
+  if (!isInitialized) return <PageLoader />;
 
-  // checkAuth done, no user found → go to login
+  // Auth check done, no user found → go to login
   if (!user) return <Navigate to="/login" replace />;
 
-  // checkAuth done, user found → render the page
+  // Auth check done, user found → render the page
   return <Outlet />;
 };
 

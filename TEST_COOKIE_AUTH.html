@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cookie Auth Test</title>
+  <style>
+    body {
+      font-family: 'Courier New', monospace;
+      max-width: 800px;
+      margin: 50px auto;
+      padding: 20px;
+      background: #0d1f0f;
+      color: #e8f5e9;
+    }
+    h1 { color: #4caf50; }
+    button {
+      background: #4caf50;
+      color: #0a1f0b;
+      border: none;
+      padding: 10px 20px;
+      margin: 5px;
+      cursor: pointer;
+      font-weight: bold;
+      border-radius: 4px;
+    }
+    button:hover { background: #66bb6a; }
+    .output {
+      background: #1a3a1c;
+      border: 1px solid #2d6a30;
+      padding: 15px;
+      margin: 10px 0;
+      border-radius: 4px;
+      white-space: pre-wrap;
+      word-break: break-all;
+    }
+    .success { color: #4caf50; }
+    .error { color: #f44336; }
+    .info { color: #81c784; }
+    input {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid #2d6a30;
+      color: #e8f5e9;
+      padding: 8px;
+      margin: 5px 0;
+      width: 100%;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🍪 Cookie Authentication Test</h1>
+  
+  <div>
+    <h2>1. Login</h2>
+    <input type="email" id="email" placeholder="Email" value="test@focusforest.com">
+    <input type="password" id="password" placeholder="Password" value="password">
+    <button onclick="testLogin()">Login</button>
+  </div>
+
+  <div>
+    <h2>2. Check Auth</h2>
+    <button onclick="testAuthMe()">GET /auth/me</button>
+  </div>
+
+  <div>
+    <h2>3. Check Cookies</h2>
+    <button onclick="checkCookies()">Check document.cookie</button>
+    <button onclick="checkStoredCookies()">Check DevTools Cookies</button>
+  </div>
+
+  <div>
+    <h2>4. Logout</h2>
+    <button onclick="testLogout()">Logout</button>
+  </div>
+
+  <div id="output" class="output">Ready to test...</div>
+
+  <script>
+    const API_BASE = '/api/v1';
+    const output = document.getElementById('output');
+
+    function log(message, type = 'info') {
+      const timestamp = new Date().toLocaleTimeString();
+      const className = type === 'success' ? 'success' : type === 'error' ? 'error' : 'info';
+      output.innerHTML += `<span class="${className}">[${timestamp}] ${message}</span>\n`;
+      output.scrollTop = output.scrollHeight;
+    }
+
+    async function testLogin() {
+      const email = document.getElementById('email').value;
+      const password = document.getElementById('password').value;
+      
+      log('🔐 Attempting login...', 'info');
+      
+      try {
+        const response = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify({ email, password })
+        });
+
+        const data = await response.json();
+        
+        if (response.ok) {
+          log(`✅ Login successful! User: ${data.user.email}`, 'success');
+          log(`User ID: ${data.user.id}`, 'info');
+          log(`Name: ${data.user.name}`, 'info');
+          
+          // Check if cookies were set
+          setTimeout(() => {
+            log('Checking if cookies were set...', 'info');
+            checkCookies();
+          }, 500);
+        } else {
+          log(`❌ Login failed: ${response.status} ${response.statusText}`, 'error');
+          log(`Error: ${JSON.stringify(data)}`, 'error');
+        }
+      } catch (error) {
+        log(`❌ Network error: ${error.message}`, 'error');
+      }
+    }
+
+    async function testAuthMe() {
+      log('🔍 Checking authentication...', 'info');
+      
+      try {
+        const response = await fetch(`${API_BASE}/auth/me`, {
+          method: 'GET',
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          log(`✅ Authenticated! User: ${data.email}`, 'success');
+          log(`User data: ${JSON.stringify(data, null, 2)}`, 'info');
+        } else {
+          log(`❌ Not authenticated: ${response.status} ${response.statusText}`, 'error');
+          const data = await response.json().catch(() => ({}));
+          log(`Error: ${JSON.stringify(data)}`, 'error');
+        }
+      } catch (error) {
+        log(`❌ Network error: ${error.message}`, 'error');
+      }
+    }
+
+    function checkCookies() {
+      const cookies = document.cookie;
+      
+      if (cookies) {
+        log(`🍪 document.cookie: ${cookies}`, 'info');
+        log('⚠️ Note: HttpOnly cookies will NOT appear here (this is correct!)', 'info');
+      } else {
+        log('🍪 document.cookie is empty', 'info');
+        log('ℹ️ This is EXPECTED if cookies are HttpOnly', 'info');
+        log('ℹ️ Check DevTools → Application → Cookies instead', 'info');
+      }
+    }
+
+    function checkStoredCookies() {
+      log('📋 Instructions to check stored cookies:', 'info');
+      log('1. Open DevTools (F12)', 'info');
+      log('2. Go to Application tab', 'info');
+      log('3. Expand Cookies in the left sidebar', 'info');
+      log('4. Click on http://localhost:5173', 'info');
+      log('5. Look for: sb-access-token and sb-refresh-token', 'info');
+      log('', 'info');
+      log('✅ If you see them: Cookies are stored correctly!', 'success');
+      log('❌ If you don\'t see them: Cookies were rejected by browser', 'error');
+      log('', 'info');
+      log('Expected attributes:', 'info');
+      log('  - HttpOnly: ✓', 'info');
+      log('  - SameSite: Lax', 'info');
+      log('  - Path: /', 'info');
+      log('  - Secure: (should be empty/unchecked)', 'info');
+    }
+
+    async function testLogout() {
+      log('🚪 Logging out...', 'info');
+      
+      try {
+        const response = await fetch(`${API_BASE}/auth/logout`, {
+          method: 'POST',
+          credentials: 'include'
+        });
+
+        if (response.ok) {
+          log('✅ Logged out successfully', 'success');
+          
+          // Check if cookies were cleared
+          setTimeout(() => {
+            log('Checking if cookies were cleared...', 'info');
+            checkCookies();
+          }, 500);
+        } else {
+          log(`❌ Logout failed: ${response.status} ${response.statusText}`, 'error');
+        }
+      } catch (error) {
+        log(`❌ Network error: ${error.message}`, 'error');
+      }
+    }
+
+    // Initial check
+    log('🚀 Cookie Auth Test Tool Ready', 'success');
+    log('', 'info');
+    log('Instructions:', 'info');
+    log('1. Make sure Vite dev server is running', 'info');
+    log('2. Click "Login" to test authentication', 'info');
+    log('3. Check if cookies are stored in DevTools', 'info');
+    log('4. Click "GET /auth/me" to verify cookies are sent', 'info');
+    log('', 'info');
+    log('Expected flow:', 'info');
+    log('  Login → Cookies stored → /auth/me returns 200', 'success');
+    log('', 'info');
+  </script>
+</body>
+</html>
