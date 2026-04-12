@@ -1,12 +1,35 @@
-.agent
-.agents
-node_modules
-
-# Environment files
+# Environment files (CRITICAL)
 .env
 .env.local
-.env.*.local
+.env.development
+.env.production
+.env.staging
+.env*.local
 
-# But keep the template environment files
-!.env.development
-!.env.production
+# Dependencies
+node_modules/
+
+# Build output
+dist/
+build/
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Editor files
+.vscode/
+.idea/
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Vite cache
+.vite/
+
+# Test coverage
+coverage/

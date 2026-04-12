@@ -1,4 +1,4 @@
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { useEffect, useRef } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { useAuthStore } from './stores/authStore';
@@ -20,69 +20,35 @@ import {
 } from './pages/StubPages';
 
 // ── Error Fallback ────────────────────────────────────────────────────────────
-function ErrorFallback() {
+function ErrorFallback({ resetErrorBoundary }: { resetErrorBoundary: () => void }) {
+  const navigate = useNavigate();
+
+  const handleRecover = () => {
+    resetErrorBoundary();
+    navigate('/dashboard', { replace: true });
+  };
+
   return (
-    <div
-      style={{
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        minHeight: '100vh',
-        background: '#F2F2F2',
-        padding: '20px',
-        textAlign: 'center',
-      }}
-    >
-      <div
-        style={{
-          background: '#FFFFFF',
-          border: '2px solid #1A1A1A',
-          boxShadow: '4px 4px 0px 0px rgba(26,26,26,1)',
-          borderRadius: '8px',
-          padding: '48px 32px',
-          maxWidth: '500px',
-        }}
-      >
-        <h1
-          style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontWeight: 700,
-            fontSize: '24px',
-            color: '#1A1A1A',
-            marginBottom: '16px',
-          }}
-        >
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', 
+      minHeight: '100vh', background: '#F2F2F2', padding: '20px', textAlign: 'center' }}>
+      <div style={{ background: '#FFFFFF', border: '2px solid #1A1A1A', 
+        boxShadow: '4px 4px 0px 0px rgba(26,26,26,1)', borderRadius: '8px', 
+        padding: '48px 32px', maxWidth: '500px' }}>
+        <h1 style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, 
+          fontSize: '24px', color: '#1A1A1A', marginBottom: '16px' }}>
           Something went wrong
         </h1>
-        <p
-          style={{
-            fontFamily: "'Inter', sans-serif",
-            fontSize: '16px',
-            color: 'rgba(26,26,26,0.6)',
-            marginBottom: '24px',
-          }}
-        >
+        <p style={{ fontFamily: "'Inter', sans-serif", fontSize: '16px', 
+          color: 'rgba(26,26,26,0.6)', marginBottom: '24px' }}>
           The app encountered an unexpected error.
         </p>
-        <a
-          href="/"
-          style={{
-            display: 'inline-block',
-            padding: '12px 24px',
-            background: '#006D37',
-            color: '#FAFAFA',
-            border: '2px solid #1A1A1A',
-            boxShadow: '4px 4px 0px 0px rgba(26,26,26,1)',
-            borderRadius: '4px',
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontSize: '16px',
-            fontWeight: 700,
-            textDecoration: 'none',
-            textTransform: 'uppercase',
-          }}
-        >
-          Reload App
-        </a>
+        <button onClick={handleRecover} style={{ padding: '12px 24px', 
+          background: '#006D37', color: '#FAFAFA', border: '2px solid #1A1A1A',
+          boxShadow: '4px 4px 0px 0px rgba(26,26,26,1)', borderRadius: '4px',
+          fontFamily: "'Space Grotesk', sans-serif", fontSize: '16px', 
+          fontWeight: 700, cursor: 'pointer', textTransform: 'uppercase' }}>
+          Recover Session
+        </button>
       </div>
     </div>
   );
