@@ -41,6 +41,7 @@ export function useWeekData(weekId: string) {
   return useQuery({
     queryKey: ['trees', 'week', weekId],
     queryFn: () => treeApi.week(weekId),
+    enabled: !!weekId, // Don't fire if weekId is empty
     staleTime: 60_000,
   });
 }
