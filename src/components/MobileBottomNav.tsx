@@ -164,6 +164,7 @@ export default function MobileBottomNav({
               title={item.label}
               aria-label={item.label}
               onClick={() => navigate(item.path)}
+              className="transition-all duration-200 ease-out active:scale-[0.97] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
               style={{
                 background:   isActive ? GREEN : 'none',
                 border:       'none',

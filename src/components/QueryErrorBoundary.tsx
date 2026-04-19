@@ -127,6 +127,7 @@ export default function QueryErrorBoundary({ error, resetError }: Props) {
         {/* Try Again Button */}
         <button
           onClick={handleRetry}
+          className="transition-all duration-200 ease-out active:scale-[0.97] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             width: '100%',
             maxWidth: '280px',
@@ -142,19 +143,6 @@ export default function QueryErrorBoundary({ error, resetError }: Props) {
             textTransform: 'uppercase',
             letterSpacing: '0.05em',
             cursor: 'pointer',
-            transition: 'transform 0.15s',
-          }}
-          onMouseDown={(e) => {
-            e.currentTarget.style.transform = 'translate(2px, 2px)';
-            e.currentTarget.style.boxShadow = '2px 2px 0px 0px rgba(26,26,26,1)';
-          }}
-          onMouseUp={(e) => {
-            e.currentTarget.style.transform = 'translate(0, 0)';
-            e.currentTarget.style.boxShadow = SHADOW;
-          }}
-          onMouseLeave={(e) => {
-            e.currentTarget.style.transform = 'translate(0, 0)';
-            e.currentTarget.style.boxShadow = SHADOW;
           }}
         >
           Try Again

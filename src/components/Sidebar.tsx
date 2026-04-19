@@ -20,6 +20,7 @@
 
 import { useNavigate } from 'react-router-dom';
 import type { ReactNode } from 'react';
+import { useAuthStore } from '../stores/authStore';
 
 // ─── Design tokens ─────────────────────────────────────────────────────────────
 const GREEN      = '#006D37';
@@ -144,6 +145,7 @@ const NAV_ITEMS: NavItem[] = [
 
 export default function Sidebar({ activePage = 'dashboard' }: { activePage?: PageKey }) {
   const navigate = useNavigate();
+  const user = useAuthStore((s) => s.user);
 
   return (
     <aside
@@ -238,6 +240,7 @@ export default function Sidebar({ activePage = 'dashboard' }: { activePage?: Pag
                   key={item.key}
                   title={item.label}
                   onClick={() => navigate(item.path)}
+                  className="transition-all duration-200 ease-out active:scale-[0.97] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     /*
                       Active state (from Figma image):
@@ -283,6 +286,7 @@ export default function Sidebar({ activePage = 'dashboard' }: { activePage?: Pag
         <button
           title="Profile"
           onClick={() => navigate('/profile')}
+          className="transition-all duration-200 ease-out active:scale-[0.97] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             background: 'none',
             border: 'none',
@@ -300,7 +304,15 @@ export default function Sidebar({ activePage = 'dashboard' }: { activePage?: Pag
           onMouseEnter={e => ((e.currentTarget as HTMLButtonElement).style.opacity = '1')}
           onMouseLeave={e => ((e.currentTarget as HTMLButtonElement).style.opacity = '0.7')}
         >
-          <ProfileIcon color={DARK} />
+          {user?.avatarUrl ? (
+            <img 
+              src={user.avatarUrl} 
+              alt="Profile" 
+              style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover', border: `1.5px solid ${DARK}` }} 
+            />
+          ) : (
+            <ProfileIcon color={DARK} />
+          )}
         </button>
       </div>
     </aside>

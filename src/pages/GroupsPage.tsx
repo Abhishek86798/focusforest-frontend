@@ -65,7 +65,7 @@ function StatusBadge({ status, isMobile }: { status: 'focus' | 'afk'; isMobile: 
   );
 }
 
-function Avatar({ size = 48 }: { size?: number }) {
+function Avatar({ size = 48, avatarUrl = null, name = '?' }: { size?: number; avatarUrl?: string | null; name?: string }) {
   return (
     <div style={{
       width: size, height: size,
@@ -73,7 +73,19 @@ function Avatar({ size = 48 }: { size?: number }) {
       border: `1px solid ${DARK}`,
       background: SUPERWHITE,
       flexShrink: 0,
-    }} />
+      overflow: 'hidden',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+    }}>
+      {avatarUrl ? (
+        <img src={avatarUrl} alt={name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+      ) : (
+        <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: size * 0.4, color: DARK }}>
+          {name.charAt(0).toUpperCase()}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -84,7 +96,7 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
   isMobile: boolean;
 }) {
   const queryClient = useQueryClient();
-  const { data: groupsData } = useGroups();
+  const { data: groupsData, isLoading: groupsLoading } = useGroups();
   const groups = groupsData?.groups || [];
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showJoinModal, setShowJoinModal] = useState(false);
@@ -121,11 +133,11 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
     onError: (error: any) => {
       const code = error?.response?.data?.error?.code;
       if (code === 'INVALID_INVITE_CODE') {
-        setJoinError('Invalid invite code. Check with your group admin.');
+        setJoinError('Invalid invite code');
       } else if (code === 'ALREADY_MEMBER') {
-        setJoinError("You're already in this group.");
+        setJoinError("You're already in this group");
       } else if (code === 'GROUP_FULL') {
-        setJoinError('This group is full (5 members max).');
+        setJoinError('This group is full (max 5 members)');
       } else {
         setJoinError('Failed to join group. Please try again.');
       }
@@ -150,19 +162,7 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
 
   return (
     <>
-      <div style={{
-        width: isMobile ? '100%' : '549px',
-        flexShrink: 0,
-        background: SUPERWHITE,
-        border: BORDER2,
-        boxShadow: SHADOW,
-        borderRadius: '4px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 0,
-        overflow: 'hidden',
-        alignSelf: 'flex-start',
-      }}>
+      <div className="w-full shrink-0 bg-[#FAFAFA] rounded-[4px] flex flex-col overflow-hidden self-start" style={{ border: BORDER2, boxShadow: SHADOW }}>
 
         {/* Header */}
         <div style={{
@@ -189,21 +189,22 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
         </div>
 
         {/* Group cards */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          gap: isMobile ? '12px' : '16px',
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6" style={{
           padding: isMobile ? '0 20px' : '0 36px',
         }}>
-          {groups.length === 0 ? (
+          {groupsLoading ? (
+            [1, 2, 3].map(i => (
+              <div key={i} className="animate-pulse bg-[#FAFAFA] border-2 border-[#1A1A1A] rounded-[4px] w-full" style={{ height: isMobile ? '80px' : '100px' }} />
+            ))
+          ) : groups.length === 0 ? (
             <div style={{
-              padding: isMobile ? '32px 16px' : '48px 24px',
+              padding: '48px 0',
               textAlign: 'center',
               color: '#666',
               fontFamily: "'Inter', sans-serif",
               fontSize: isMobile ? '14px' : '16px',
             }}>
-              No groups yet. Create one or join with a code!
+              You haven't joined any groups yet. Create a tribe or join one with a code!
             </div>
           ) : (
             groups.map((group, i) => {
@@ -217,6 +218,7 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: i * 0.06 }}
                   onClick={() => onSelect(group.id)}
+                  className="2xl:p-6"
                   style={{
                     background: isSelected ? GREEN : SUPERWHITE,
                     border: `1.52px solid ${DARK}`,
@@ -228,6 +230,7 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
                     flexDirection: 'column',
                     gap: '0px',
                     transition: 'transform 0.12s',
+                    width: '100%',
                   }}
                 >
                   {/* Row: name + badge */}
@@ -288,6 +291,7 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
         }}>
           <button
             onClick={() => setShowCreateModal(true)}
+            className="transition-all duration-200 ease-out active:scale-[0.97] hover:bg-gray-50 hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               width: '100%',
               height: isMobile ? '56px' : '80px',
@@ -300,7 +304,6 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
               gap: isMobile ? '8px' : '12px',
               cursor: 'pointer',
               opacity: 0.6,
-              transition: 'opacity 0.18s',
             }}
           >
             <svg width={isMobile ? '16' : '21'} height={isMobile ? '16' : '21'} viewBox="0 0 21 21" fill="none">
@@ -321,6 +324,7 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
 
           <button
             onClick={() => setShowJoinModal(true)}
+            className="transition-all duration-200 ease-out active:scale-[0.97] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               width: '100%',
               height: isMobile ? '56px' : '80px',
@@ -332,7 +336,6 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
               justifyContent: 'center',
               gap: isMobile ? '8px' : '12px',
               cursor: 'pointer',
-              transition: 'transform 0.18s',
             }}
           >
             <svg width={isMobile ? '16' : '20'} height={isMobile ? '16' : '20'} viewBox="0 0 20 20" fill="none">
@@ -365,15 +368,7 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
           zIndex: 1000,
           padding: '20px',
         }}>
-          <div style={{
-            background: SUPERWHITE,
-            border: BORDER2,
-            boxShadow: SHADOW,
-            borderRadius: '8px',
-            padding: isMobile ? '24px' : '32px',
-            maxWidth: '400px',
-            width: '100%',
-          }}>
+          <div className="bg-[#FAFAFA] rounded-lg w-full max-w-md lg:max-w-lg px-4 md:px-10 py-6 md:py-8 mx-auto" style={{ border: BORDER2, boxShadow: SHADOW }}>
             {inviteCode ? (
               <>
                 <h3 style={{
@@ -416,6 +411,7 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
                     setShowCreateModal(false);
                     setInviteCode(null);
                   }}
+                  className="transition-all duration-200 ease-out active:scale-[0.97] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                   style={{
                     width: '100%',
                     padding: '12px',
@@ -426,7 +422,6 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
                     fontFamily: "'Space Grotesk', sans-serif",
                     fontSize: '16px',
                     fontWeight: 700,
-                    cursor: 'pointer',
                   }}
                 >
                   Done
@@ -459,12 +454,13 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
                     boxSizing: 'border-box',
                   }}
                 />
-                <div style={{ display: 'flex', gap: '12px' }}>
+                <div className="flex flex-col md:flex-row gap-3">
                   <button
                     onClick={() => {
                       setShowCreateModal(false);
                       setNewGroupName('');
                     }}
+                    className="transition-all duration-200 ease-out active:scale-[0.97] hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
                       flex: 1,
                       padding: '12px',
@@ -475,7 +471,6 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
                       fontFamily: "'Space Grotesk', sans-serif",
                       fontSize: '16px',
                       fontWeight: 700,
-                      cursor: 'pointer',
                     }}
                   >
                     Cancel
@@ -483,6 +478,7 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
                   <button
                     onClick={handleCreate}
                     disabled={!newGroupName.trim() || createMutation.isPending}
+                    className="transition-all duration-200 ease-out active:scale-[0.97] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
                       flex: 1,
                       padding: '12px',
@@ -493,8 +489,6 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
                       fontFamily: "'Space Grotesk', sans-serif",
                       fontSize: '16px',
                       fontWeight: 700,
-                      cursor: newGroupName.trim() ? 'pointer' : 'not-allowed',
-                      opacity: newGroupName.trim() ? 1 : 0.5,
                     }}
                   >
                     {createMutation.isPending ? 'Creating...' : 'Create'}
@@ -518,15 +512,7 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
           zIndex: 1000,
           padding: '20px',
         }}>
-          <div style={{
-            background: SUPERWHITE,
-            border: BORDER2,
-            boxShadow: SHADOW,
-            borderRadius: '8px',
-            padding: isMobile ? '24px' : '32px',
-            maxWidth: '400px',
-            width: '100%',
-          }}>
+          <div className="bg-[#FAFAFA] rounded-lg w-full max-w-md lg:max-w-lg px-4 md:px-10 py-6 md:py-8 mx-auto" style={{ border: BORDER2, boxShadow: SHADOW }}>
             <h3 style={{
               fontFamily: "'Space Grotesk', sans-serif",
               fontSize: isMobile ? '20px' : '24px',
@@ -580,13 +566,14 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
                 {joinError}
               </p>
             )}
-            <div style={{ display: 'flex', gap: '12px', marginTop: '16px' }}>
+            <div className="flex flex-col md:flex-row gap-3 mt-4">
               <button
                 onClick={() => {
                   setShowJoinModal(false);
                   setJoinCode('');
                   setJoinError(null);
                 }}
+                className="transition-all duration-200 ease-out active:scale-[0.97] hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   flex: 1,
                   padding: '12px',
@@ -597,7 +584,6 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
                   fontFamily: "'Space Grotesk', sans-serif",
                   fontSize: '16px',
                   fontWeight: 700,
-                  cursor: 'pointer',
                 }}
               >
                 Cancel
@@ -605,6 +591,7 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
               <button
                 onClick={handleJoin}
                 disabled={joinCode.length !== 6 || joinMutation.isPending}
+                className="transition-all duration-200 ease-out active:scale-[0.97] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   flex: 1,
                   padding: '12px',
@@ -615,8 +602,6 @@ function LeftPanel({ selectedId, onSelect, isMobile }: {
                   fontFamily: "'Space Grotesk', sans-serif",
                   fontSize: '16px',
                   fontWeight: 700,
-                  cursor: joinCode.length === 6 ? 'pointer' : 'not-allowed',
-                  opacity: joinCode.length === 6 ? 1 : 0.5,
                 }}
               >
                 {joinMutation.isPending ? 'Joining...' : 'Join'}
@@ -637,7 +622,7 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
 }) {
   const queryClient = useQueryClient();
   const user = useAuthStore(s => s.user);
-  const { data: groupDetails } = useGroupDetails(groupId);
+  const { data: groupDetails, isError: isGroupError, error: groupError } = useGroupDetails(groupId);
   const { data: memberStatusData } = useGroupMemberStatus(groupId);
   const members = memberStatusData?.members || [];
   const isAdmin = groupDetails?.adminUserId === user?.id;
@@ -650,6 +635,14 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
       queryClient.invalidateQueries({ queryKey: ['groups'] });
       onLeaveGroup();
     },
+    onError: (error: any) => {
+      const code = error?.response?.data?.error?.code;
+      if (code === 'NOT_GROUP_ADMIN' || error?.response?.status === 403) {
+        toast.error('Only the admin can delete this group');
+      } else {
+        toast.error('Something went wrong. Please try again.');
+      }
+    }
   });
 
   const leaveMutation = useMutation({
@@ -705,6 +698,29 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
     );
   }
 
+  if (isGroupError) {
+    const status = (groupError as any)?.response?.status;
+    const code = (groupError as any)?.response?.data?.error?.code;
+    let msg = 'Failed to load group details.';
+    if (status === 404) msg = 'Group not found';
+    if (status === 403 || code === 'NOT_GROUP_MEMBER') msg = "You're not a member of this group";
+    
+    return (
+      <div style={{
+        background: WHITE,
+        border: BORDER2,
+        boxShadow: SHADOW,
+        borderRadius: '4px',
+        padding: isMobile ? '32px 16px' : '64px 32px',
+        textAlign: 'center',
+      }}>
+        <span style={{ fontFamily: "'Inter', sans-serif", fontSize: isMobile ? '14px' : '16px', color: '#DC2626' }}>
+          {msg}
+        </span>
+      </div>
+    );
+  }
+
   return (
     <div style={{
       background: WHITE,
@@ -740,6 +756,7 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
           <button
             onClick={handleDelete}
             disabled={deleteMutation.isPending}
+            className="min-h-[44px] min-w-[44px] transition-all duration-200 ease-out active:scale-[0.97] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
               fontWeight: 700,
@@ -751,9 +768,6 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
               border: `1px solid ${confirmDelete ? '#DC2626' : DARK}`,
               borderRadius: '2px',
               padding: isMobile ? '6px 12px' : '8px 16px',
-              cursor: deleteMutation.isPending ? 'wait' : 'pointer',
-              opacity: deleteMutation.isPending ? 0.5 : 1,
-              transition: 'background 0.2s, color 0.2s, border-color 0.2s',
             }}
           >
             {deleteMutation.isPending ? 'Deleting...' : confirmDelete ? 'Tap again to confirm' : 'Delete Group'}
@@ -762,6 +776,7 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
           <button
             onClick={handleLeave}
             disabled={leaveMutation.isPending}
+            className="min-h-[44px] min-w-[44px] transition-all duration-200 ease-out active:scale-[0.97] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
               fontWeight: 700,
@@ -773,9 +788,6 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
               border: `1px solid #DC2626`,
               borderRadius: '2px',
               padding: isMobile ? '6px 12px' : '8px 16px',
-              cursor: leaveMutation.isPending ? 'wait' : 'pointer',
-              opacity: leaveMutation.isPending ? 0.5 : 1,
-              transition: 'background 0.2s, color 0.2s',
             }}
           >
             {leaveMutation.isPending ? 'Leaving...' : confirmLeave ? 'Tap again to confirm' : 'Leave Group'}
@@ -783,24 +795,17 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
         )}
       </div>
 
-      {/* Table */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 0, overflowX: 'auto' }}>
-        {/* Column headers */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: isMobile ? '1fr 80px 60px' : '1fr 1fr 1fr 0.7fr',
-          padding: isMobile ? '0 8px' : '0 10px',
-          height: isMobile ? '36px' : '46px',
-          alignItems: 'center',
-          borderBottom: `1px solid rgba(26,28,28,0.1)`,
-          minWidth: isMobile ? '280px' : 'auto',
-        }}>
-          <span style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontWeight: 700, fontSize: isMobile ? '8px' : '10px',
-            textTransform: 'uppercase', letterSpacing: '10%',
-            color: DARK, textAlign: 'left',
-          }}>Member</span>
+      {/* Table grid wrapper equivalent to table */}
+      <div className="w-full overflow-x-auto">
+        <div className="flex flex-col min-w-[600px]">
+          {/* Column headers */}
+          <div className="grid grid-cols-[1fr_80px_60px] md:grid-cols-[1fr_1fr_1fr_0.7fr] px-2 md:px-3 h-9 md:h-[46px] items-center border-b border-[#1A1C1C1A]">
+            <span style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700, fontSize: isMobile ? '8px' : '10px',
+              textTransform: 'uppercase', letterSpacing: '10%',
+              color: DARK, textAlign: 'left',
+            }}>Member</span>
           <span style={{
             fontFamily: "'Space Grotesk', sans-serif",
             fontWeight: 700, fontSize: isMobile ? '8px' : '10px',
@@ -824,11 +829,7 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
         </div>
 
         {/* Data rows */}
-        <div style={{
-          display: 'flex',
-          flexDirection: 'column',
-          padding: isMobile ? '0 8px' : '0 10px',
-        }}>
+        <div className="flex flex-col px-2 md:px-3">
           {members.length === 0 ? (
             <div style={{
               padding: isMobile ? '24px 8px' : '32px 10px',
@@ -846,13 +847,9 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
                 initial={{ opacity: 0, x: -6 }}
                 animate={{ opacity: 1, x: 0 }}
                 transition={{ delay: 0.12 + i * 0.08 }}
+                className="grid grid-cols-[1fr_80px_60px] md:grid-cols-[1fr_1fr_1fr_0.7fr] items-center p-0"
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: isMobile ? '1fr 80px 60px' : '1fr 1fr 1fr 0.7fr',
-                  alignItems: 'center',
                   borderBottom: i < members.length - 1 ? `1px solid rgba(26,28,28,0.1)` : 'none',
-                  padding: '0',
-                  minWidth: isMobile ? '280px' : 'auto',
                 }}
               >
                 {/* Member cell */}
@@ -860,7 +857,7 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
                   display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '16px',
                   padding: isMobile ? '12px 1px' : '24px 1px',
                 }}>
-                  <Avatar size={isMobile ? 32 : 48} />
+                  <Avatar size={isMobile ? 32 : 48} avatarUrl={(member as any).avatarUrl} name={member.name} />
                   <span style={{
                     fontFamily: "'Space Grotesk', sans-serif",
                     fontWeight: 700, fontSize: isMobile ? '12px' : '16px',
@@ -913,12 +910,13 @@ function MembersTable({ groupId, isMobile, onLeaveGroup }: {
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 }
 
 // ─── Stats 2×2 grid ───────────────────────────────────────────────────────────
 function StatsGrid({ groupId, isMobile }: { groupId: string | null; isMobile: boolean }) {
-  const { data: stats } = useGroupStats(groupId);
+  const { data: stats, isLoading: statsLoading } = useGroupStats(groupId);
 
   if (!groupId) {
     return (
@@ -949,20 +947,16 @@ function StatsGrid({ groupId, isMobile }: { groupId: string | null; isMobile: bo
   ];
 
   return (
-    <div style={{
-      background: SUPERWHITE,
-      border: BORDER2,
-      boxShadow: SHADOW,
-      borderRadius: '4px',
-      padding: isMobile ? '16px' : '48px 56px',
-    }}>
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(2, 1fr)',
-        gridTemplateRows: 'repeat(2, 1fr)',
-        gap: isMobile ? '12px' : '18px',
-      }}>
-        {cards.map(card => (
+    <div className="bg-[#FAFAFA] rounded-[4px] px-4 py-4 md:px-14 md:py-12" style={{ border: BORDER2, boxShadow: SHADOW }}>
+      <div className={`grid grid-cols-2 lg:grid-cols-4 ${isMobile ? 'gap-3' : 'gap-[18px]'}`}>
+        {statsLoading ? (
+          <>
+            <div className="animate-pulse bg-[#E8E8E8] border-2 border-[#1A1A1A] w-full" style={{ height: isMobile ? '100px' : '190px' }} />
+            <div className="animate-pulse bg-[#E8E8E8] border-2 border-[#1A1A1A] w-full" style={{ height: isMobile ? '100px' : '190px' }} />
+            <div className="animate-pulse bg-[#E8E8E8] border-2 border-[#1A1A1A] w-full" style={{ height: isMobile ? '100px' : '190px' }} />
+            <div className="animate-pulse bg-[#E8E8E8] border-2 border-[#1A1A1A] w-full" style={{ height: isMobile ? '100px' : '190px' }} />
+          </>
+        ) : cards.map(card => (
           <StatCard key={card.label} card={card} isMobile={isMobile} />
         ))}
       </div>
@@ -1067,16 +1061,7 @@ function WeeklySection({ groupId, isMobile }: { groupId: string | null; isMobile
   }
 
   return (
-    <div style={{
-      background: SUPERWHITE,
-      border: BORDER2,
-      boxShadow: SHADOW,
-      borderRadius: '4px',
-      padding: isMobile ? '16px' : '32px',
-      display: 'flex',
-      flexDirection: 'column',
-      gap: isMobile ? '16px' : '32px',
-    }}>
+    <div className="bg-[#FAFAFA] rounded-[4px] px-4 py-4 md:px-8 md:py-8 flex flex-col gap-4 md:gap-8 overflow-x-auto w-full" style={{ border: BORDER2, boxShadow: SHADOW }}>
       {/* Header row */}
       <div style={{
         display: 'flex',
@@ -1107,11 +1092,7 @@ function WeeklySection({ groupId, isMobile }: { groupId: string | null; isMobile
       </div>
 
       {/* 7 day columns */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(7, 1fr)',
-        gap: isMobile ? '4px' : '12px',
-      }}>
+      <div className="grid grid-cols-7 gap-1 md:gap-3 min-w-[600px] md:min-w-0">
         {WEEK_DAYS.map((day, i) => {
           const { isPast, isToday, isFuture, hasTree } = dayStates[i];
 
@@ -1221,19 +1202,12 @@ export default function GroupsPage() {
   };
 
   return (
-    <div style={{ display: 'flex', minHeight: '100vh', background: BG }}>
+    <div style={{ display: 'flex', height: '100vh', background: BG, overflow: 'hidden' }}>
       {!isMobile && <Sidebar activePage="groups" />}
 
       {/* Main content */}
-      <div style={{
-        marginLeft: isMobile ? 0 : '101px',
-        flex: 1,
-        padding: isMobile ? '20px 16px 100px' : '24px',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: isMobile ? '16px' : '24px',
-        boxSizing: 'border-box',
-      }}>
+      <div className="flex-1 flex flex-col box-border ml-0 md:ml-[101px] h-screen overflow-y-auto overflow-x-hidden">
+        <div className="w-full px-4 md:px-8 lg:px-12 max-w-5xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[1600px] mx-auto py-5 md:py-6 pb-[100px] md:pb-6 flex flex-col gap-4 md:gap-6">
 
         {/* Mobile Header */}
         {isMobile && (
@@ -1255,13 +1229,8 @@ export default function GroupsPage() {
           </div>
         )}
 
-        {/* Top area: Left panel + Right panels */}
-        <div style={{
-          display: 'flex',
-          flexDirection: isMobile ? 'column' : 'row',
-          gap: isMobile ? '16px' : '24px',
-          alignItems: 'flex-start',
-        }}>
+        {/* Top area: Stacked panels for better wide screen layout */}
+        <div className="flex flex-col gap-6 w-full">
 
           {/* Left: Your Groups */}
           <LeftPanel
@@ -1271,13 +1240,7 @@ export default function GroupsPage() {
           />
 
           {/* Right column: Members + Stats stacked */}
-          <div style={{
-            flex: 1,
-            display: 'flex',
-            flexDirection: 'column',
-            gap: isMobile ? '16px' : '24px',
-            width: isMobile ? '100%' : 'auto',
-          }}>
+          <div className="flex-1 flex flex-col gap-4 lg:gap-6 w-full lg:w-auto min-w-0">
             <MembersTable groupId={selectedId} isMobile={isMobile} onLeaveGroup={handleLeaveGroup} />
             <StatsGrid groupId={selectedId} isMobile={isMobile} />
           </div>
@@ -1287,7 +1250,9 @@ export default function GroupsPage() {
         <WeeklySection groupId={selectedId} isMobile={isMobile} />
 
         {/* Bottom spacer */}
+        {/* Bottom spacer */}
         <div style={{ height: '24px' }} />
+        </div>
       </div>
 
       {isMobile && <MobileBottomNav activePage="groups" />}

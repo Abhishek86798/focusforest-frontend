@@ -14,6 +14,7 @@ export interface User {
   totalFocusMinutes: number;
   totalTrees: number;          // all-time completed trees (stage 4)
   isPrivate: boolean;
+  default_variant?: SessionVariant;
   createdAt: string;
 }
 

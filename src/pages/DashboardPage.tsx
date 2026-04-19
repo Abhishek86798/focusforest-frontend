@@ -7,9 +7,10 @@ import { useAuthStore } from '../stores/authStore';
 import { useQueryClient } from '@tanstack/react-query';
 import { sessionApi } from '../api';
 import { useSessionStore } from '../stores/sessionStore';
-import { useTreeToday, useSessions, useWeekData, useStatsSummary, useStreak } from '../hooks/useForestData';
-import { getCurrentWeekId } from '../utils';
+import { useTreeToday, useSessions, useStreak } from '../hooks/useForestData';
+
 import toast from 'react-hot-toast';
+import type { SessionVariant } from '../types';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
@@ -47,17 +48,17 @@ const FOCUS_CIRC = 2 * Math.PI * FOCUS_RADIUS;
 
 // ─── Mobile Timer (Figma 192:17 — 288×288, stroke 4px) ────────────────────
 
-const MOB_SIZE   = 288;
+const MOB_SIZE = 288;
 const MOB_STROKE = 4;
 const MOB_RADIUS = MOB_SIZE / 2 - MOB_STROKE / 2;  // 142
-const MOB_CIRC   = 2 * Math.PI * MOB_RADIUS;        // ≈ 892.35
+const MOB_CIRC = 2 * Math.PI * MOB_RADIUS;        // ≈ 892.35
 
 // ─── Mobile Focus Timer (Figma 192:233 — 308.22×308.22, stroke 4.28px) ───────
 
-const MOB_FOCUS_SIZE   = 308.22;
+const MOB_FOCUS_SIZE = 308.22;
 const MOB_FOCUS_STROKE = 4.28;
 const MOB_FOCUS_RADIUS = MOB_FOCUS_SIZE / 2 - MOB_FOCUS_STROKE / 2;  // ≈ 151.97
-const MOB_FOCUS_CIRC   = 2 * Math.PI * MOB_FOCUS_RADIUS;              // ≈ 954.9
+const MOB_FOCUS_CIRC = 2 * Math.PI * MOB_FOCUS_RADIUS;              // ≈ 954.9
 
 // ─── Mobile ProfileIcon (Figma 192:33 — 28×28) ────────────────────────────
 const MobileProfileIcon = ({ color = '#1A1A1A' }: { color?: string }) => (
@@ -71,7 +72,10 @@ const MobileProfileIcon = ({ color = '#1A1A1A' }: { color?: string }) => (
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
 import VariantPickerModal from '../components/VariantPickerModal';
-import AbandonSessionModal from '../components/AbandonSessionModal';
+
+import TreeDisplay from '../components/TreeDisplay';
+import TaskPromptModal from '../components/TaskPromptModal';
+import SessionCompletePopup from '../components/SessionCompletePopup';
 
 function SessionPopup({ task, onAction }: { task: string; onAction: (status: 'completed' | 'none') => void }) {
   return (
@@ -111,50 +115,13 @@ function SessionHistory({ sessions }: { sessions: any[] }) {
   const getOutcomeBadge = (taskStatus: string) => {
     switch (taskStatus) {
       case 'completed':
-        return (
-          <span style={{
-            padding: '4px 12px',
-            borderRadius: '4px',
-            background: 'rgba(0,109,55,0.1)',
-            color: '#006D37',
-            fontSize: '12px',
-            fontWeight: 600,
-            fontFamily: "'Inter', sans-serif",
-          }}>
-            SUCCESS
-          </span>
-        );
+        return <span className="text-emerald-600 font-medium whitespace-nowrap">✅ Done</span>;
       case 'carried':
-        return (
-          <span style={{
-            padding: '4px 12px',
-            borderRadius: '4px',
-            background: 'rgba(220,38,38,0.1)',
-            color: '#DC2626',
-            fontSize: '12px',
-            fontWeight: 600,
-            fontFamily: "'Inter', sans-serif",
-          }}>
-            WITHERED
-          </span>
-        );
+        return <span className="text-amber-600 font-medium whitespace-nowrap">➡️ Carried</span>;
       default:
-        return (
-          <span style={{
-            padding: '4px 12px',
-            borderRadius: '4px',
-            background: 'rgba(0,0,0,0.05)',
-            color: '#666',
-            fontSize: '12px',
-            fontWeight: 600,
-            fontFamily: "'Inter', sans-serif",
-          }}>
-            NO TASK
-          </span>
-        );
+        return <span className="text-gray-400 font-medium">—</span>;
     }
   };
-
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr);
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
@@ -237,26 +204,28 @@ export default function DashboardPage() {
   const { data: sessionsData } = useSessions();
   const recentSessions = sessionsData?.sessions.slice(0, 5) || [];
 
-  // Fetch current week data
-  const currentWeekId = getCurrentWeekId();
-  const { data: weekData } = useWeekData(currentWeekId);
 
-  // Fetch stats summary
-  const { data: stats } = useStatsSummary();
 
   const isMobile = useIsMobile();
-  const { 
-    selectedVariant, customFocusMinutes, alwaysUseVariant, 
+  const {
+    selectedVariant, customFocusMinutes, alwaysUseVariant,
     sessionId, carryForwardTask, setCarryForwardTask,
     startSession: storeStartSession, abandonSession: storeAbandonSession,
-    completeSession: storeCompleteSession,
+    completeSession: storeCompleteSession, setVariant,
   } = useSessionStore();
   const customBreakMinutes = useSessionStore(s => (s as any).customBreakMinutes || 5);
 
   const [showVariantPicker, setShowVariantPicker] = useState(false);
   const [sessionPhase, setSessionPhase] = useState<'focus' | 'break' | 'longBreak'>('focus');
   const [showSessionPopup, setShowSessionPopup] = useState(false);
-  const [showAbandonModal, setShowAbandonModal] = useState(false);
+  const [showAbandonConfirm, setShowAbandonConfirm] = useState(false);
+  const [showTaskPrompt, setShowTaskPrompt] = useState(false);
+  const [pendingVariant, setPendingVariant] = useState<SessionVariant | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
+  
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const [lastSubmissionPayload, setLastSubmissionPayload] = useState<any>(null);
 
   const getVariantSeconds = (v: string, phase: 'focus' | 'break' | 'longBreak') => {
     if (phase === 'longBreak') return 15 * 60;
@@ -332,25 +301,36 @@ export default function DashboardPage() {
         });
       }, 1000);
     } else {
-      clearInterval(intervalRef.current!);
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     }
-    return () => clearInterval(intervalRef.current!);
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+    };
   }, [running, sessionPhase]);
 
   useEffect(() => {
-    if (showSessionPopup && !task) {
-      const timer = setTimeout(() => {
-        handlePopupComplete('none');
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
+    // Explicitly removed auto-close for accurate history
   }, [showSessionPopup, task]);
 
-  const handlePopupComplete = async (status: 'completed' | 'none') => {
+  const submitSessionResult = async (status: 'completed' | 'carried' | 'none', customPayload?: any) => {
     try {
-      if (sessionId) {
-        const res = await sessionApi.complete(sessionId, status);
-        // Update streak in react-query cache from the response
+      setIsSubmitting(true);
+      setSubmitError(null);
+      const payload = customPayload || {
+        sessionId: sessionId!,
+        status,
+        taskText: task || null
+      };
+      setLastSubmissionPayload(payload);
+
+      if (payload.sessionId) {
+        const res = await sessionApi.complete(payload.sessionId, payload.status);
         if (res?.streak?.currentStreak !== undefined) {
           queryClient.setQueryData(['stats', 'streak'], (old: any) => ({
             ...old,
@@ -358,43 +338,68 @@ export default function DashboardPage() {
           }));
         }
       }
+
+      if (payload.status === 'completed') {
+        setTask('');
+        setCarryForwardTask(null);
+      } else if (payload.status === 'carried') {
+        setCarryForwardTask(task);
+      }
+      
+      storeCompleteSession(streakData?.currentStreak ?? 0); 
+      queryClient.invalidateQueries({ queryKey: ['trees'] });
+      queryClient.invalidateQueries({ queryKey: ['sessions'] });
+      queryClient.invalidateQueries({ queryKey: ['stats'] });
+
+      setShowSessionPopup(false);
+      setIsSubmitting(false);
+      setLastSubmissionPayload(null);
+      const is4thSession = completedSessions + 1 === TOTAL_SESSIONS;
+      setSessionPhase(is4thSession ? 'longBreak' : 'break');
+      setRunning(true);
     } catch (err) {
       console.error('Failed to complete session', err);
-      toast.error('Could not save session. Please try again.');
+      setSubmitError('Could not save session. Please try again.');
+      setIsSubmitting(false);
+      toast.error('Session save failed.');
     }
-
-    if (status === 'completed') {
-      setTask('');
-      setCarryForwardTask(null);
-    }
-    storeCompleteSession(streakData?.currentStreak ?? 0); // use correct store action
-
-    queryClient.invalidateQueries({ queryKey: ['trees'] });
-    queryClient.invalidateQueries({ queryKey: ['sessions'] });
-    queryClient.invalidateQueries({ queryKey: ['stats'] });
-
-    setShowSessionPopup(false);
-    const is4thSession = completedSessions + 1 === TOTAL_SESSIONS;
-    setSessionPhase(is4thSession ? 'longBreak' : 'break');
-    setRunning(true);
   };
 
+  const handlePopupComplete = async (status: 'completed' | 'carried' | 'none') => {
+    await submitSessionResult(status);
+  };
+
+  const handleRetrySubmit = async () => {
+    if (lastSubmissionPayload) {
+      await submitSessionResult(lastSubmissionPayload.status, lastSubmissionPayload);
+    }
+  };
 
   const ringColor = sessionPhase === 'focus' ? '#006D37' : '#F9C74F';
 
-  const handleStartSessionFlow = async () => {
+  const handleStartSessionFlow = async (taskText?: string) => {
     try {
+      if (taskText !== undefined) {
+        setTask(taskText);
+        setCarryForwardTask(taskText);
+      }
+      const activeVariant = pendingVariant || selectedVariant;
+      
       const clientSessionId = crypto.randomUUID();
-      const focusMins = Math.floor(getVariantSeconds(selectedVariant, 'focus') / 60);
+      const focusMins = Math.floor(getVariantSeconds(activeVariant, 'focus') / 60);
 
       const res = await sessionApi.start({
-        variant: selectedVariant,
+        variant: activeVariant,
         focusMinutes: focusMins,
-        taskText: task || null,
+        taskText: taskText !== undefined ? taskText : (task || null),
         clientSessionId,
       });
 
-      // Store sessionId BEFORE starting timer
+      if (pendingVariant) {
+        setVariant(pendingVariant as SessionVariant);
+        setPendingVariant(null);
+      }
+      setShowTaskPrompt(false);
       storeStartSession(res.sessionId, clientSessionId, focusMins);
       setRunning(true);
     } catch (err) {
@@ -404,41 +409,37 @@ export default function DashboardPage() {
   };
 
   const handleStart = () => {
-    if (alwaysUseVariant) {
-      handleStartSessionFlow();
+    if (alwaysUseVariant && selectedVariant) {
+      setPendingVariant(selectedVariant);
+      setShowTaskPrompt(true);
     } else {
       setShowVariantPicker(true);
     }
   };
 
   const handleAbandonClick = () => {
-    setShowAbandonModal(true);
+    setShowAbandonConfirm(true);
   };
 
-  const executeAbandon = async (carryForward: boolean) => {
-    try {
-      if (sessionId) {
-        // POST /sessions/:id/abandon (not PATCH)
-        await sessionApi.abandon(sessionId);
-      }
-    } catch (err) {
-      console.error('Failed to abandon session', err);
-      toast.error('Could not abandon session. Please try again.');
-    }
-
-    if (carryForward && task) {
-      setCarryForwardTask(task);
-    } else {
-      setTask('');
-      setCarryForwardTask(null);
-    }
-
-    storeAbandonSession();
-    setShowAbandonModal(false);
+  const handleConfirmAbandon = () => {
+    storeAbandonSession(); // Updates keep-alive properties but clears isRunning & ID context
+    setShowAbandonConfirm(false);
     setRunning(false);
+    
+    // Cleanup interval safely
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+
     setSessionPhase('focus');
     setTimeLeft(getVariantSeconds(selectedVariant, 'focus'));
-    queryClient.invalidateQueries({ queryKey: ['sessions'] });
+    setTask(''); // Clear task on pure abandon, but leave carryForward in store
+    toast('Session abandoned', { icon: '🍂' });
+  };
+
+  const handleCancelAbandon = () => {
+    setShowAbandonConfirm(false);
   };
 
   const idleProgress = timeLeft / modeSeconds;
@@ -449,19 +450,19 @@ export default function DashboardPage() {
 
   // ── MOBILE Focus Mode (Figma 192:233) ─────────────────────────────────────
   if (isMobile && (focusMode || (timeLeft < modeSeconds && timeLeft > 0))) {
-    const mobFocusProgress   = timeLeft / modeSeconds;
+    const mobFocusProgress = timeLeft / modeSeconds;
     const mobFocusDashOffset = MOB_FOCUS_CIRC * (1 - mobFocusProgress);
 
     return (
       <div
         style={{
           /* Figma 192:233: 402×874, White (#F2F2F2) */
-          height:        '100dvh',
-          background:    '#F2F2F2',
-          display:       'flex',
+          height: '100dvh',
+          background: '#F2F2F2',
+          display: 'flex',
           flexDirection: 'column',
-          overflow:      'hidden',
-          position:      'relative',
+          overflow: 'hidden',
+          position: 'relative',
         }}
       >
         {/*
@@ -472,14 +473,14 @@ export default function DashboardPage() {
         */}
         <main
           style={{
-            flex:           1,
-            padding:        '48px 35px 40px',
-            display:        'flex',
-            flexDirection:  'column',
-            alignItems:     'center',
+            flex: 1,
+            padding: '48px 35px 40px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
             justifyContent: 'space-between',
-            boxSizing:      'border-box',
-            overflowY:      'auto',
+            boxSizing: 'border-box',
+            overflowY: 'auto',
           }}
         >
           {/* ── Task chip (layout_0G1W7U): 156×32.96 ──
@@ -492,44 +493,44 @@ export default function DashboardPage() {
               {/* Shadow (layout_XT95IJ): offset 3.66px */}
               <div
                 style={{
-                  position:     'absolute',
-                  left:         3.66,
-                  top:          3.66,
-                  width:        152.34,
-                  height:       29.3,
-                  background:   '#1A1A1A',
+                  position: 'absolute',
+                  left: 3.66,
+                  top: 3.66,
+                  width: 152.34,
+                  height: 29.3,
+                  background: '#1A1A1A',
                   borderRadius: 5,
                 }}
               />
               {/* Green chip (layout_SGXTD1) */}
               <div
                 style={{
-                  position:       'absolute',
-                  left:           0,
-                  top:            0,
-                  width:          152.34,
-                  height:         29.3,
-                  background:     '#006D37',
-                  borderRadius:   5,
-                  display:        'flex',
-                  alignItems:     'center',
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: 152.34,
+                  height: 29.3,
+                  background: '#006D37',
+                  borderRadius: 5,
+                  display: 'flex',
+                  alignItems: 'center',
                   justifyContent: 'center',
-                  overflow:       'hidden',
+                  overflow: 'hidden',
                 }}
               >
                 <span
                   style={{
-                    fontFamily:    "'Space Grotesk', sans-serif",
-                    fontWeight:    700,
-                    fontSize:      10.25,
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontWeight: 700,
+                    fontSize: 10.25,
                     letterSpacing: '5%',
                     textTransform: 'uppercase',
-                    color:         '#FAFAFA',
-                    whiteSpace:    'nowrap',
-                    overflow:      'hidden',
-                    textOverflow:  'ellipsis',
-                    maxWidth:      '100%',
-                    padding:       '0 8px',
+                    color: '#FAFAFA',
+                    whiteSpace: 'nowrap',
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
+                    maxWidth: '100%',
+                    padding: '0 8px',
                   }}
                 >
                   {task}
@@ -544,11 +545,11 @@ export default function DashboardPage() {
           {/* ── Forest image (layout_NQ8IOS): w=fill, h=228 ── */}
           <div
             style={{
-              width:        '100%',
-              height:       228,
+              width: '100%',
+              height: 228,
               borderRadius: 12,
-              overflow:     'hidden',
-              flexShrink:   0,
+              overflow: 'hidden',
+              flexShrink: 0,
             }}
           >
             <img
@@ -567,9 +568,9 @@ export default function DashboardPage() {
           ── */}
           <div
             style={{
-              width:      MOB_FOCUS_SIZE,
-              height:     MOB_FOCUS_SIZE,
-              position:   'relative',
+              width: MOB_FOCUS_SIZE,
+              height: MOB_FOCUS_SIZE,
+              position: 'relative',
               flexShrink: 0,
             }}
           >
@@ -599,21 +600,21 @@ export default function DashboardPage() {
                 style_R7MZXL: SG 700, 68.49px */}
             <span
               style={{
-                position:       'absolute',
-                left:           58.33,
-                top:            53.42,
-                width:          191.21,
-                height:         87,
-                display:        'flex',
-                alignItems:     'center',
+                position: 'absolute',
+                left: 58.33,
+                top: 53.42,
+                width: 191.21,
+                height: 87,
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
-                fontFamily:     "'Space Grotesk', sans-serif",
-                fontWeight:     700,
-                fontSize:       68.49,
-                lineHeight:     1.276,
-                color:          '#1A1A1A',
-                letterSpacing:  '-2px',
-                whiteSpace:     'nowrap',
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 700,
+                fontSize: 68.49,
+                lineHeight: 1.276,
+                color: '#1A1A1A',
+                letterSpacing: '-2px',
+                whiteSpace: 'nowrap',
               }}
             >
               {formatTime(timeLeft)}
@@ -626,47 +627,47 @@ export default function DashboardPage() {
             <div
               style={{
                 position: 'absolute',
-                left:     101.85,
-                top:      160.42,
-                width:    103.45,
-                height:   38.53,
+                left: 101.85,
+                top: 160.42,
+                width: 103.45,
+                height: 38.53,
               }}
             >
               {/* Shadow */}
               <div
                 style={{
-                  position:     'absolute',
-                  left:         2.85,
-                  top:          2.85,
-                  width:        100.6,
-                  height:       35.67,
-                  background:   '#1A1A1A',
+                  position: 'absolute',
+                  left: 2.85,
+                  top: 2.85,
+                  width: 100.6,
+                  height: 35.67,
+                  background: '#1A1A1A',
                   borderRadius: 6,
                 }}
               />
               <button
                 onClick={() => setRunning(r => !r)}
                 style={{
-                  position:     'absolute',
-                  left:         0,
-                  top:          0,
-                  width:        100.6,
-                  height:       35.67,
-                  background:   '#006D37',
-                  border:       'none',
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: 100.6,
+                  height: 35.67,
+                  background: '#006D37',
+                  border: 'none',
                   borderRadius: 6,
-                  cursor:       'pointer',
-                  fontFamily:   "'Inter', sans-serif",
-                  fontWeight:   700,
-                  fontSize:     17.12,
-                  color:        '#FAFAFA',
-                  transition:   'transform 0.1s',
+                  cursor: 'pointer',
+                  fontFamily: "'Inter', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 17.12,
+                  color: '#FAFAFA',
+                  transition: 'transform 0.1s',
                 }}
-                onMouseDown={e  => (e.currentTarget.style.transform = 'translate(2.85px,2.85px)')}
-                onMouseUp={e    => (e.currentTarget.style.transform = 'none')}
+                onMouseDown={e => (e.currentTarget.style.transform = 'translate(2.85px,2.85px)')}
+                onMouseUp={e => (e.currentTarget.style.transform = 'none')}
                 onMouseLeave={e => (e.currentTarget.style.transform = 'none')}
-                onTouchStart={e  => ((e.currentTarget as HTMLButtonElement).style.transform = 'translate(2.85px,2.85px)')}
-                onTouchEnd={e    => ((e.currentTarget as HTMLButtonElement).style.transform = 'none')}
+                onTouchStart={e => ((e.currentTarget as HTMLButtonElement).style.transform = 'translate(2.85px,2.85px)')}
+                onTouchEnd={e => ((e.currentTarget as HTMLButtonElement).style.transform = 'none')}
               >
                 {running ? 'Focus' : 'Resume'}
               </button>
@@ -677,30 +678,30 @@ export default function DashboardPage() {
                 effect_AXFW74: active ring rgba(0,109,55,0.2) spread=2.46px */}
             <div
               style={{
-                position:      'absolute',
-                left:          122.8,
-                top:           221.66,
-                display:       'flex',
+                position: 'absolute',
+                left: 122.8,
+                top: 221.66,
+                display: 'flex',
                 flexDirection: 'row',
-                gap:           9.82,
-                alignItems:    'center',
+                gap: 9.82,
+                alignItems: 'center',
               }}
             >
               {Array.from({ length: TOTAL_SESSIONS }).map((_, i) => {
-                const done   = i < completedSessions;
+                const done = i < completedSessions;
                 const active = i === completedSessions;
                 return (
                   <div
                     key={i}
                     style={{
-                      width:        7.37,
-                      height:       7.37,
+                      width: 7.37,
+                      height: 7.37,
                       borderRadius: '50%',
-                      background:   done ? '#006D37' : 'transparent',
-                      border:       `1.8px solid ${done ? '#006D37' : active ? '#006D37' : '#C4C4C4'}`,
+                      background: done ? '#006D37' : 'transparent',
+                      border: `1.8px solid ${done ? '#006D37' : active ? '#006D37' : '#C4C4C4'}`,
                       /* effect_AXFW74: boxShadow spread 2.46px green glow */
-                      boxShadow:    active ? '0 0 0 2.46px rgba(0,109,55,0.2)' : 'none',
-                      transition:   'all 0.3s ease',
+                      boxShadow: active ? '0 0 0 2.46px rgba(0,109,55,0.2)' : 'none',
+                      transition: 'all 0.3s ease',
                     }}
                   />
                 );
@@ -711,17 +712,17 @@ export default function DashboardPage() {
                 style_ZABD48: Inter 700, 9.99px */}
             <span
               style={{
-                position:   'absolute',
-                left:       116.22,
-                top:        251.75,
-                width:      77,
-                height:     12,
-                textAlign:  'center',
+                position: 'absolute',
+                left: 116.22,
+                top: 251.75,
+                width: 77,
+                height: 12,
+                textAlign: 'center',
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 700,
-                fontSize:   9.99,
+                fontSize: 9.99,
                 lineHeight: 1.21,
-                color:      '#1A1A1A',
+                color: '#1A1A1A',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -733,22 +734,22 @@ export default function DashboardPage() {
           <button
             onClick={handleAbandonClick}
             style={{
-              width:          208,
-              height:         30.81,
-              flexShrink:     0,
-              background:     'none',
-              border:         'none',
-              cursor:         'pointer',
-              fontFamily:     "'Space Grotesk', sans-serif",
-              fontWeight:     700,
-              fontSize:       10.27,
-              lineHeight:     1.558,
-              letterSpacing:  '0.24em',
-              textTransform:  'uppercase',
+              width: 208,
+              height: 30.81,
+              flexShrink: 0,
+              background: 'none',
+              border: 'none',
+              cursor: 'pointer',
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontWeight: 700,
+              fontSize: 10.27,
+              lineHeight: 1.558,
+              letterSpacing: '0.24em',
+              textTransform: 'uppercase',
               textDecoration: 'underline',
               textUnderlineOffset: '3px',
-              color:          '#1A1A1A',
-              transition:     'opacity 0.2s',
+              color: '#1A1A1A',
+              transition: 'opacity 0.2s',
             }}
             onMouseEnter={e => (e.currentTarget.style.opacity = '0.5')}
             onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
@@ -759,16 +760,33 @@ export default function DashboardPage() {
 
         {showSessionPopup && <SessionPopup task={task} onAction={handlePopupComplete} />}
 
-        {showAbandonModal && (
-          <AbandonSessionModal
-            task={task || null}
-            onCarryForward={() => executeAbandon(true)}
-            onEndSession={() => executeAbandon(false)}
-            onClose={() => setShowAbandonModal(false)}
-          />
-        )}
-
-        <VariantPickerModal
+        {showAbandonConfirm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl text-center">
+              <div className="text-4xl mb-3">🍂</div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                Abandon this session?
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Your progress for this focus session will be lost. Your daily tree will not be affected.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancelAbandon}
+                  className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+                >
+                  Keep Going 💪
+                </button>
+                <button
+                  onClick={handleConfirmAbandon}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium"
+                >
+                  Abandon
+                </button>
+              </div>
+            </div>
+          </div>
+        )}        <VariantPickerModal
           isOpen={showVariantPicker}
           onClose={() => setShowVariantPicker(false)}
           onContinue={() => {
@@ -832,8 +850,8 @@ export default function DashboardPage() {
             }}
           >
             {/* Tree */}
-            <div style={{ width: 'clamp(200px, 38vw, 580px)', aspectRatio: '580/398', borderRadius: 16, overflow: 'hidden', flexShrink: 1 }}>
-              <img src="/images/tree_hero.png" alt="Focus Forest" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+            <div style={{ width: 'clamp(200px, 38vw, 580px)', aspectRatio: '580/398', overflow: 'hidden', flexShrink: 1 }}>
+              <TreeDisplay stage={treeToday?.stage ?? 4} glowLevel={treeToday?.glowLevel ?? 0} size="lg" animate={true} />
             </div>
 
             {/* Timer circle */}
@@ -900,25 +918,53 @@ export default function DashboardPage() {
         </div>
 
         {showSessionPopup && <SessionPopup task={task} onAction={handlePopupComplete} />}
+
+        {showAbandonConfirm && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl text-center">
+              <div className="text-4xl mb-3">🍂</div>
+              <h3 className="text-lg font-bold text-gray-900 mb-2">
+                Abandon this session?
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Your progress for this focus session will be lost. Your daily tree will not be affected.
+              </p>
+              <div className="flex gap-3">
+                <button
+                  onClick={handleCancelAbandon}
+                  className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+                >
+                  Keep Going 💪
+                </button>
+                <button
+                  onClick={handleConfirmAbandon}
+                  className="flex-1 px-4 py-3 bg-gray-100 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium"
+                >
+                  Abandon
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
 
   // ── MOBILE IDLE layout ──────────────────────────────────────────────────
   if (isMobile) {
-    const mobProgress   = timeLeft / modeSeconds;
+    const mobProgress = timeLeft / modeSeconds;
     const mobDashOffset = MOB_CIRC * (1 - mobProgress);
 
     return (
       <div
         style={{
           /* Figma 192:4 frame: 402×874, White (#F2F2F2) background */
-          height:         '100dvh',
-          background:     '#F2F2F2',
-          display:        'flex',
-          flexDirection:  'column',
-          overflow:       'hidden',
-          position:       'relative',
+          height: '100dvh',
+          background: '#F2F2F2',
+          display: 'flex',
+          flexDirection: 'column',
+          overflow: 'hidden',
+          position: 'relative',
         }}
       >
         {/* ── Mobile Header (layout_799P1H) —
@@ -927,25 +973,25 @@ export default function DashboardPage() {
         ── */}
         <header
           style={{
-            display:        'flex',
-            flexDirection:  'row',
-            alignItems:     'center',
+            display: 'flex',
+            flexDirection: 'row',
+            alignItems: 'center',
             justifyContent: 'space-between',
-            padding:        '22px 20px 0',
-            flexShrink:     0,
+            padding: '22px 20px 0',
+            flexShrink: 0,
           }}
         >
           {/* Streak badge — layout_XUYIOG: 53×24.7, Light Green rgba(187,233,194,0.5) */}
           <div
             style={{
-              width:          53,
-              height:         24.7,
-              background:     'rgba(187, 233, 194, 0.5)',
-              borderRadius:   24,
-              display:        'flex',
-              alignItems:     'center',
+              width: 53,
+              height: 24.7,
+              background: 'rgba(187, 233, 194, 0.5)',
+              borderRadius: 24,
+              display: 'flex',
+              alignItems: 'center',
               justifyContent: 'center',
-              gap:            5.15,  // layout_2JMTQL gap
+              gap: 5.15,  // layout_2JMTQL gap
             }}
           >
             {/* Streak leaf icon — layout_BA4X4C: 11.58×11.58 */}
@@ -957,9 +1003,9 @@ export default function DashboardPage() {
               style={{
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 500,
-                fontSize:   16.47,
+                fontSize: 16.47,
                 lineHeight: 1,
-                color:      '#006D37',
+                color: '#006D37',
               }}
             >
               {currentStreak}
@@ -971,10 +1017,10 @@ export default function DashboardPage() {
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
               fontWeight: 700,
-              fontSize:   20,
+              fontSize: 20,
               lineHeight: 1.276,
-              color:      '#1A1A1A',
-              margin:     0,
+              color: '#1A1A1A',
+              margin: 0,
             }}
           >
             Focus Forest
@@ -985,12 +1031,12 @@ export default function DashboardPage() {
             onClick={() => navigate('/profile')}
             style={{
               background: 'none',
-              border:     'none',
-              padding:    0,
-              cursor:     'pointer',
-              width:      28,
-              height:     28,
-              display:    'flex',
+              border: 'none',
+              padding: 0,
+              cursor: 'pointer',
+              width: 28,
+              height: 28,
+              display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
             }}
@@ -1004,32 +1050,31 @@ export default function DashboardPage() {
         ── */}
         <main
           style={{
-            flex:           1,
-            overflowY:      'auto',
+            flex: 1,
+            overflowY: 'auto',
             /* x=35 → sides 35px (8.7% of 402), top matches y=91 - header height */
-            padding:        '25px 35px 90px',
-            display:        'flex',
-            flexDirection:  'column',
-            alignItems:     'center',
-            gap:            38,
-            boxSizing:      'border-box',
+            padding: '25px 35px 90px',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            gap: 38,
+            boxSizing: 'border-box',
           }}
         >
-          {/* ── Forest image — layout_WPW8LI: w=fill, h=228 ── */}
+          {/* ── Forest image ── */}
           <div
             style={{
-              width:        '100%',
-              height:       228,
+              width: '100%',
+              height: 228,
               borderRadius: 12,
-              overflow:     'hidden',
-              flexShrink:   0,
+              overflow: 'hidden',
+              flexShrink: 0,
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
             }}
           >
-            <img
-              src="/images/tree_hero.png"
-              alt="Focus Forest"
-              style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-            />
+            <TreeDisplay stage={treeToday?.stage ?? 4} glowLevel={treeToday?.glowLevel ?? 0} size="md" animate={true} />
           </div>
 
           {/* ── Timer circle (layout_665RMR): 288×288 ──
@@ -1040,9 +1085,9 @@ export default function DashboardPage() {
           ── */}
           <div
             style={{
-              width:      MOB_SIZE,
-              height:     MOB_SIZE,
-              position:   'relative',
+              width: MOB_SIZE,
+              height: MOB_SIZE,
+              position: 'relative',
               flexShrink: 0,
             }}
           >
@@ -1072,19 +1117,19 @@ export default function DashboardPage() {
                 style_3V19RG: Space Grotesk 700, 64px, lh=1.276 */}
             <span
               style={{
-                position:   'absolute',
-                left:       54.5,
-                top:        49.91,
-                width:      178.67,
-                height:     82,
-                display:    'flex',
+                position: 'absolute',
+                left: 54.5,
+                top: 49.91,
+                width: 178.67,
+                height: 82,
+                display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
                 fontFamily: "'Space Grotesk', sans-serif",
                 fontWeight: 700,
-                fontSize:   64,
+                fontSize: 64,
                 lineHeight: 1.276,
-                color:      '#1A1A1A',
+                color: '#1A1A1A',
                 letterSpacing: '-2px',
                 whiteSpace: 'nowrap',
               }}
@@ -1100,45 +1145,45 @@ export default function DashboardPage() {
             <div
               style={{
                 position: 'absolute',
-                left:     95.17,
-                top:      149.9,
-                width:    96.67,
-                height:   36,
+                left: 95.17,
+                top: 149.9,
+                width: 96.67,
+                height: 36,
               }}
             >
               {/* Shadow (layout_DC9K18): offset 2.67px */}
               <div
                 style={{
-                  position:     'absolute',
-                  inset:        0,
-                  background:   '#1A1A1A',
+                  position: 'absolute',
+                  inset: 0,
+                  background: '#1A1A1A',
                   borderRadius: 6,
-                  transform:    'translate(2.67px, 2.67px)',
+                  transform: 'translate(2.67px, 2.67px)',
                 }}
               />
               <button
                 onClick={handleStart}
                 style={{
-                  position:     'absolute',
-                  left:         0,
-                  top:          0,
-                  width:        94,
-                  height:       33.33,
-                  background:   '#006D37',
-                  border:       'none',
+                  position: 'absolute',
+                  left: 0,
+                  top: 0,
+                  width: 94,
+                  height: 33.33,
+                  background: '#006D37',
+                  border: 'none',
                   borderRadius: 6,
-                  cursor:       'pointer',
-                  fontFamily:   "'Inter', sans-serif",
-                  fontWeight:   700,
-                  fontSize:     16,
-                  color:        '#FAFAFA',
-                  transition:   'transform 0.1s',
+                  cursor: 'pointer',
+                  fontFamily: "'Inter', sans-serif",
+                  fontWeight: 700,
+                  fontSize: 16,
+                  color: '#FAFAFA',
+                  transition: 'transform 0.1s',
                 }}
-                onMouseDown={e  => (e.currentTarget.style.transform = 'translate(2.67px,2.67px)')}
-                onMouseUp={e    => (e.currentTarget.style.transform = 'none')}
+                onMouseDown={e => (e.currentTarget.style.transform = 'translate(2.67px,2.67px)')}
+                onMouseUp={e => (e.currentTarget.style.transform = 'none')}
                 onMouseLeave={e => (e.currentTarget.style.transform = 'none')}
-                onTouchStart={e  => ((e.currentTarget as HTMLButtonElement).style.transform = 'translate(2.67px,2.67px)')}
-                onTouchEnd={e    => ((e.currentTarget as HTMLButtonElement).style.transform = 'none')}
+                onTouchStart={e => ((e.currentTarget as HTMLButtonElement).style.transform = 'translate(2.67px,2.67px)')}
+                onTouchEnd={e => ((e.currentTarget as HTMLButtonElement).style.transform = 'none')}
               >
                 Start
               </button>
@@ -1148,16 +1193,16 @@ export default function DashboardPage() {
                 style_7IHSYT: Inter 700, 9.33px, center */}
             <span
               style={{
-                position:  'absolute',
-                left:      108.6,
-                top:       235.24,
-                width:     72,
+                position: 'absolute',
+                left: 108.6,
+                top: 235.24,
+                width: 72,
                 textAlign: 'center',
                 fontFamily: "'Inter', sans-serif",
                 fontWeight: 700,
-                fontSize:  9.33,
+                fontSize: 9.33,
                 lineHeight: 1.21,
-                color:     '#1A1A1A',
+                color: '#1A1A1A',
                 whiteSpace: 'nowrap',
               }}
             >
@@ -1168,26 +1213,26 @@ export default function DashboardPage() {
           {/* ── Task + Variant (layout_HJMJU8): w=282.93, column, gap=35.81 ── */}
           <div
             style={{
-              width:          '100%',
-              maxWidth:       282.93,
-              display:        'flex',
-              flexDirection:  'column',
-              alignItems:     'center',
-              gap:            35.81,
+              width: '100%',
+              maxWidth: 282.93,
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+              gap: 35.81,
             }}
           >
             {/* Input (layout_64R2WR): 217.27×41.78, Super White, 0.6px border */}
             <div
               style={{
-                width:        217.27,
-                height:       41.78,
-                background:   '#FAFAFA',
-                border:       '0.6px solid #1A1A1A',
+                width: 217.27,
+                height: 41.78,
+                background: '#FAFAFA',
+                border: '0.6px solid #1A1A1A',
                 borderRadius: 4,
-                display:      'flex',
-                alignItems:   'center',
+                display: 'flex',
+                alignItems: 'center',
                 justifyContent: 'center',
-                boxSizing:    'border-box',
+                boxSizing: 'border-box',
               }}
             >
               <input
@@ -1196,17 +1241,17 @@ export default function DashboardPage() {
                 value={task}
                 onChange={e => setTask(e.target.value)}
                 style={{
-                  background:  'none',
-                  border:      'none',
-                  outline:     'none',
-                  width:       '100%',
-                  padding:     '0 12px',
-                  textAlign:   'center',
-                  fontFamily:  "'Inter', sans-serif",
-                  fontWeight:  500,
+                  background: 'none',
+                  border: 'none',
+                  outline: 'none',
+                  width: '100%',
+                  padding: '0 12px',
+                  textAlign: 'center',
+                  fontFamily: "'Inter', sans-serif",
+                  fontWeight: 500,
                   /* style_IOW0DO: fontSize=11.94 */
-                  fontSize:    11.94,
-                  color:       '#1A1A1A',
+                  fontSize: 11.94,
+                  color: '#1A1A1A',
                 }}
               />
             </div>
@@ -1216,20 +1261,20 @@ export default function DashboardPage() {
             <button
               onClick={() => setShowVariantPicker(true)}
               style={{
-                background:     'none',
-                border:         'none',
-                cursor:         'pointer',
-                fontFamily:     "'Space Grotesk', sans-serif",
-                fontWeight:     700,
-                fontSize:       11.94,
-                lineHeight:     0.8,
-                textTransform:  'uppercase',
-                letterSpacing:  '2.4%',
+                background: 'none',
+                border: 'none',
+                cursor: 'pointer',
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontWeight: 700,
+                fontSize: 11.94,
+                lineHeight: 0.8,
+                textTransform: 'uppercase',
+                letterSpacing: '2.4%',
                 textDecoration: 'underline',
                 textUnderlineOffset: '3px',
-                color:          '#1A1A1A',
-                padding:        '4px 0',
-                transition:     'opacity 0.2s',
+                color: '#1A1A1A',
+                padding: '4px 0',
+                transition: 'opacity 0.2s',
               }}
               onMouseEnter={e => (e.currentTarget.style.opacity = '0.6')}
               onMouseLeave={e => (e.currentTarget.style.opacity = '1')}
@@ -1295,170 +1340,63 @@ export default function DashboardPage() {
             Focus Forest
           </h1>
 
-          {/* Streak badge */}
-          <div
-            style={{
-              height: 'clamp(36px, 3.5vh, 48px)',
-              padding: '0 16px',
-              minWidth: 80,
-              background: 'rgba(187, 233, 194, 0.5)',
-              borderRadius: '24px',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              gap: 8,
-            }}
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-              <path d="M12 22C14.65 22 17.20 20.95 19.07 19.07C20.95 17.20 22 14.65 22 12C22 9 20 6.5 17 5C17.5 7 17 9 15 10C15 8 14 6.5 12 5C12 7 10.5 9 9 10C8 11 7 12.5 7 14C7 15.33 7.53 16.60 8.46 17.54C9.40 18.47 10.67 19 12 19" fill="#FF6B35" />
-              <path d="M12 22C13.59 22 15.12 21.37 16.24 20.24C17.37 19.12 18 17.59 18 16C18 14.5 17 13 16 12C16 13.5 15 14.5 13.5 15C14 13.5 13.5 12 12 11C12 12.5 11 13.5 10 14.5C9.5 15 9 15.9 9 17C9 18.33 9.53 19.60 10.46 20.54C11.40 21.47 12.67 22 12 22" fill="#FFD700" />
-            </svg>
-            <span
+          {/* Streak badge & Recent Sessions Button */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
+            <button
+              onClick={() => setShowHistory(true)}
               style={{
+                background: '#FFFFFF',
+                border: '1px solid #E8E8E8',
+                borderRadius: '8px',
+                padding: '8px 16px',
+                boxShadow: '0 2px 4px rgba(0,0,0,0.05)',
                 fontFamily: "'Inter', sans-serif",
-                fontWeight: 500,
-                fontSize: 'clamp(20px, 2vw, 28px)',
-                color: '#006D37',
-                lineHeight: 1,
+                fontSize: '14px',
+                fontWeight: 600,
+                color: '#666',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                transition: 'box-shadow 0.2s',
+              }}
+              onMouseEnter={e => (e.currentTarget.style.boxShadow = '0 4px 6px rgba(0,0,0,0.1)')}
+              onMouseLeave={e => (e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.05)')}
+            >
+              📋 <span style={{ display: isMobile ? 'none' : 'inline' }}>Recent Sessions</span>
+            </button>
+
+            <div
+              style={{
+                height: 'clamp(36px, 3.5vh, 48px)',
+                padding: '0 16px',
+                minWidth: 80,
+                background: 'rgba(187, 233, 194, 0.5)',
+                borderRadius: '24px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 8,
               }}
             >
-              {currentStreak}
-            </span>
-          </div>
-        </header>
-
-        {/* Week View */}
-        <section
-          style={{
-            padding: '24px 40px 0',
-            flexShrink: 0,
-          }}
-        >
-          <div style={{
-            display: 'flex',
-            flexDirection: 'row',
-            gap: '12px',
-            justifyContent: 'center',
-            maxWidth: '900px',
-            margin: '0 auto',
-          }}>
-            {weekData?.days.map((day) => {
-              const isToday = day.date === new Date().toISOString().split('T')[0];
-              const dayOfWeek = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'][new Date(day.date).getDay()];
-              
-              // Display logic:
-              // - stage 0 + isBare false → seed icon (today, no sessions yet)
-              // - stage 0 + isBare true → empty dashed border (missed day)
-              // - stage 1-4 → tree emoji for that stage
-              const showEmpty = day.stage === 0 && day.isBare;
-              const treeEmoji = ['🌰', '🌱', '🌿', '🌳', '🌲'][day.stage];
-
-              return (
-                <div
-                  key={day.date}
-                  style={{
-                    flex: 1,
-                    minWidth: '80px',
-                    maxWidth: '120px',
-                    height: '100px',
-                    background: isToday ? '#006D37' : '#FAFAFA',
-                    border: showEmpty ? '2px dashed #C4C4C4' : '1px solid #E8E8E8',
-                    borderRadius: '12px',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    transition: 'transform 0.2s',
-                    cursor: 'default',
-                  }}
-                >
-                  <span style={{
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: '12px',
-                    fontWeight: 600,
-                    color: isToday ? '#FAFAFA' : '#666',
-                  }}>
-                    {dayOfWeek}
-                  </span>
-                  <span style={{
-                    fontSize: showEmpty ? '24px' : '32px',
-                    lineHeight: 1,
-                  }}>
-                    {showEmpty ? '' : treeEmoji}
-                  </span>
-                  <span style={{
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: '11px',
-                    color: isToday ? '#FAFAFA' : '#999',
-                  }}>
-                    {new Date(day.date).getDate()}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        </section>
-
-        {/* Stat Cards */}
-        <section
-          style={{
-            padding: '24px 40px 0',
-            flexShrink: 0,
-          }}
-        >
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
-            gap: '16px',
-            maxWidth: '900px',
-            margin: '0 auto',
-          }}>
-            {[
-              { label: 'Total Minutes', value: stats?.totalMinutes ?? '--', icon: '⏱️' },
-              { label: 'Trees Completed', value: stats?.treesCompleted ?? '--', icon: '🌲' },
-              { label: 'Sessions', value: stats?.sessions ?? '--', icon: '🎯' },
-              { label: 'Task Completion', value: stats ? `${Math.round(stats.taskCompletionRate * 100)}%` : '--', icon: '✅' },
-            ].map((stat, idx) => (
-              <div
-                key={idx}
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                <path d="M12 22C14.65 22 17.20 20.95 19.07 19.07C20.95 17.20 22 14.65 22 12C22 9 20 6.5 17 5C17.5 7 17 9 15 10C15 8 14 6.5 12 5C12 7 10.5 9 9 10C8 11 7 12.5 7 14C7 15.33 7.53 16.60 8.46 17.54C9.40 18.47 10.67 19 12 19" fill="#FF6B35" />
+                <path d="M12 22C13.59 22 15.12 21.37 16.24 20.24C17.37 19.12 18 17.59 18 16C18 14.5 17 13 16 12C16 13.5 15 14.5 13.5 15C14 13.5 13.5 12 12 11C12 12.5 11 13.5 10 14.5C9.5 15 9 15.9 9 17C9 18.33 9.53 19.60 10.46 20.54C11.40 21.47 12.67 22 12 22" fill="#FFD700" />
+              </svg>
+              <span
                 style={{
-                  background: '#FAFAFA',
-                  border: '1px solid #E8E8E8',
-                  borderRadius: '12px',
-                  padding: '20px',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  gap: '8px',
+                  fontFamily: "'Inter', sans-serif",
+                  fontWeight: 500,
+                  fontSize: 'clamp(20px, 2vw, 28px)',
+                  color: '#006D37',
+                  lineHeight: 1,
                 }}
               >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                }}>
-                  <span style={{ fontSize: '20px' }}>{stat.icon}</span>
-                  <span style={{
-                    fontFamily: "'Inter', sans-serif",
-                    fontSize: '13px',
-                    color: '#666',
-                    fontWeight: 500,
-                  }}>
-                    {stat.label}
-                  </span>
-                </div>
-                <span style={{
-                  fontFamily: "'Space Grotesk', sans-serif",
-                  fontSize: '28px',
-                  fontWeight: 700,
-                  color: '#1A1A1A',
-                }}>
-                  {stat.value}
-                </span>
-              </div>
-            ))}
+                {currentStreak}
+              </span>
+            </div>
           </div>
-        </section>
+        </header>
 
         {/* Hero section */}
         <section
@@ -1473,27 +1411,7 @@ export default function DashboardPage() {
             overflow: 'hidden',
           }}
         >
-          {/* Today's Tree Status */}
-          {treeToday && (
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '12px',
-              padding: '12px 20px',
-              background: 'rgba(0,109,55,0.08)',
-              borderRadius: '8px',
-              border: '1px solid rgba(0,109,55,0.2)',
-            }}>
-              <span style={{
-                fontFamily: "'Inter', sans-serif",
-                fontSize: '14px',
-                color: '#006D37',
-                fontWeight: 500,
-              }}>
-                Today's Tree: Stage {treeToday.stage} • {treeToday.totalSessions} session{treeToday.totalSessions !== 1 ? 's' : ''}
-              </span>
-            </div>
-          )}
+
 
           {/* Timer + Tree row */}
           <div
@@ -1506,7 +1424,7 @@ export default function DashboardPage() {
               width: '100%',
             }}
           >
-            {/* Tree image */}
+            {/* Tree display */}
             <div
               style={{
                 width: 'clamp(180px, 36vw, 520px)',
@@ -1516,11 +1434,7 @@ export default function DashboardPage() {
                 flexShrink: 1,
               }}
             >
-              <img
-                src="/images/tree_hero.png"
-                alt="Focus Forest tree illustration"
-                style={{ width: '100%', height: '100%', objectFit: 'cover' }}
-              />
+              <TreeDisplay stage={treeToday?.stage ?? 4} glowLevel={treeToday?.glowLevel ?? 0} size="lg" animate={true} />
             </div>
 
             {/* Timer circle */}
@@ -1530,6 +1444,7 @@ export default function DashboardPage() {
                 aspectRatio: '1 / 1',
                 position: 'relative',
                 flexShrink: 0,
+                transform: 'translateY(17px) scale(0.85)',
               }}
             >
               <svg
@@ -1693,19 +1608,126 @@ export default function DashboardPage() {
             </button>
           </div>
         </section>
-
-        {/* Session History */}
-        <SessionHistory sessions={recentSessions} />
       </main>
 
-      {showSessionPopup && <SessionPopup task={task} onAction={handlePopupComplete} />}
+      {/* Slide-out Panel for Session History */}
+      {showHistory && (
+        <div
+          style={{
+            position: 'fixed',
+            inset: 0,
+            zIndex: 40,
+            background: 'rgba(0,0,0,0.2)',
+          }}
+          onClick={() => setShowHistory(false)}
+        />
+      )}
+      <div
+        style={{
+          position: 'fixed',
+          right: 0,
+          top: 0,
+          height: '100%',
+          width: isMobile ? '100%' : '450px',
+          background: '#FAFAFA',
+          boxShadow: '-4px 0 24px rgba(0,0,0,0.1)',
+          zIndex: 50,
+          transform: showHistory ? 'translateX(0)' : 'translateX(100%)',
+          transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
+          display: 'flex',
+          flexDirection: 'column',
+        }}
+      >
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          padding: '24px',
+          borderBottom: '1px solid #E8E8E8',
+        }}>
+          <h3 style={{
+            margin: 0,
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 700,
+            fontSize: '24px',
+            color: '#1A1A1A',
+          }}>
+            Recent Sessions
+          </h3>
+          <button
+            onClick={() => setShowHistory(false)}
+            style={{
+              background: 'none',
+              border: 'none',
+              fontSize: '24px',
+              color: '#666',
+              cursor: 'pointer',
+              padding: '4px',
+            }}
+          >
+            ✕
+          </button>
+        </div>
+        <div style={{ flex: 1, overflowY: 'auto', padding: '24px' }}>
+          <SessionHistory sessions={recentSessions} />
+        </div>
+      </div>
+
+      {showSessionPopup && (
+        <SessionCompletePopup
+          isOpen={true}
+          taskText={task}
+          onComplete={handlePopupComplete}
+          isSubmitting={isSubmitting}
+          submitError={submitError}
+          onRetry={handleRetrySubmit}
+        />
+      )}
+
+      {showAbandonConfirm && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-full max-w-sm mx-4 shadow-xl text-center">
+            <div className="text-4xl mb-3">🍂</div>
+            <h3 className="text-lg font-bold text-gray-900 mb-2">
+              Abandon this session?
+            </h3>
+            <p className="text-sm text-gray-500 mb-6">
+              Your progress for this focus session will be lost. Your daily tree will not be affected.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={handleCancelAbandon}
+                className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
+              >
+                Keep Going 💪
+              </button>
+              <button
+                onClick={handleConfirmAbandon}
+                className="flex-1 px-4 py-3 bg-gray-100 text-red-600 rounded-lg hover:bg-red-50 transition-colors font-medium"
+              >
+                Abandon
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showTaskPrompt && (
+        <TaskPromptModal
+          isOpen={showTaskPrompt}
+          onCancel={() => setShowTaskPrompt(false)}
+          onStart={(taskText) => handleStartSessionFlow(taskText || undefined)}
+          carriedTask={carryForwardTask || null}
+        />
+      )}
 
       <VariantPickerModal
         isOpen={showVariantPicker}
         onClose={() => setShowVariantPicker(false)}
-        onContinue={() => {
+        onContinue={(variantKey: string) => {
+          setPendingVariant(variantKey as SessionVariant);
           setShowVariantPicker(false);
-          setRunning(true);
+          setShowTaskPrompt(true);
         }}
       />
     </div>

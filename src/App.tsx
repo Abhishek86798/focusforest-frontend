@@ -15,6 +15,7 @@ import LeaderboardPage    from './pages/LeaderboardPage';
 import ZenModePage        from './pages/ZenModePage';
 import ProfilePage        from './pages/ProfilePage';
 import NotFoundPage       from './pages/NotFoundPage';
+import AuthCallbackPage   from './pages/AuthCallbackPage';
 import {
   SessionPage,
 } from './pages/StubPages';
@@ -42,7 +43,9 @@ function ErrorFallback({ resetErrorBoundary }: { resetErrorBoundary: () => void 
           color: 'rgba(26,26,26,0.6)', marginBottom: '24px' }}>
           The app encountered an unexpected error.
         </p>
-        <button onClick={handleRecover} style={{ padding: '12px 24px', 
+        <button onClick={handleRecover} 
+          className="transition-all duration-200 ease-out active:scale-[0.97] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+          style={{ padding: '12px 24px', 
           background: '#006D37', color: '#FAFAFA', border: '2px solid #1A1A1A',
           boxShadow: '4px 4px 0px 0px rgba(26,26,26,1)', borderRadius: '4px',
           fontFamily: "'Space Grotesk', sans-serif", fontSize: '16px', 
@@ -71,6 +74,7 @@ export default function App() {
         {/* ── Public Routes ── */}
         <Route path="/login" element={<LoginPage />} />
         <Route path="/signup" element={<SignupPage />} />
+        <Route path="/auth/callback" element={<AuthCallbackPage />} />
 
         {/* ── Protected Routes ── */}
         <Route element={<ProtectedRoute />}>

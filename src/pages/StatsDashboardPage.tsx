@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import toast from 'react-hot-toast';
 import Sidebar from '../components/Sidebar';
@@ -126,9 +127,18 @@ export default function StatsDashboardPage() {
   // ── Live API data ─────────────────────────────────────────────────────────
   const currentWeekId = getCurrentWeekId();
 
+  const [limit, setLimit] = useState(20);
+  const [startDate, setStartDate] = useState<string>('');
+  const [endDate, setEndDate] = useState<string>('');
+
   const { data: stats, isLoading: statsLoading, isError: statsError } = useStatsSummary();
   const { data: streakData, isLoading: streakLoading } = useStreak();
-  const { data: sessionsData, isLoading: sessionsLoading } = useSessions({ limit: 20 });
+  
+  const filterParams: any = { limit };
+  if (startDate) filterParams.startDate = startDate;
+  if (endDate) filterParams.endDate = endDate;
+  
+  const { data: sessionsData, isLoading: sessionsLoading } = useSessions(filterParams);
   const { data: weekData, isLoading: weekLoading } = useWeekData(currentWeekId);
 
   if (statsError) {
@@ -170,16 +180,8 @@ export default function StatsDashboardPage() {
 
       {!isMobile && <Sidebar activePage="stats" />}
 
-      <main
-        style={{
-          marginLeft: isMobile ? 0 : '101px',
-          flex: 1,
-          padding: isMobile ? '20px 16px 100px' : '73px 111px 80px',
-          display: 'flex',
-          flexDirection: 'column',
-          gap: isMobile ? '20px' : '32px',
-        }}
-      >
+      <main className="flex-1 flex flex-col box-border ml-0 md:ml-[101px] h-screen overflow-y-auto overflow-x-hidden">
+        <div className="w-full px-4 md:px-8 lg:px-12 max-w-5xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[1600px] mx-auto py-5 md:pt-[73px] pb-[100px] md:pb-[80px] flex flex-col gap-5 md:gap-8">
         {/* Mobile Header */}
         {isMobile && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', paddingBottom: '8px' }}>
@@ -190,12 +192,12 @@ export default function StatsDashboardPage() {
         )}
 
         {/* ── Top row: Streak + Stats grid ── */}
-        <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? '16px' : '40px', alignItems: 'stretch' }}>
+        <div className="flex flex-col gap-4 md:gap-[40px] w-full">
 
           {/* ─ Streak Card ─ */}
           <div
             style={{
-              width: isMobile ? '100%' : '549px',
+              width: '100%',
               height: isMobile ? 'auto' : '464px',
               minHeight: isMobile ? '200px' : 'auto',
               background: SUPER_WHITE,
@@ -219,8 +221,8 @@ export default function StatsDashboardPage() {
             </div>
             <div>
               {streakLoading ? (
-                <div style={{ height: isMobile ? '96px' : '256px', background: '#E8E8E8', animation: 'pulse 1.5s ease-in-out infinite', borderRadius: '4px' }} />
-              ) : (
+                  <div className="animate-pulse bg-[#E8E8E8] rounded-[4px]" style={{ height: isMobile ? '96px' : '256px' }} />
+                ) : (
                 <>
                   <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? '48px' : '128px', lineHeight: '1em', letterSpacing: isMobile ? '-2px' : '-6px', textTransform: 'uppercase', color: DARK, display: 'block' }}>
                     {currentStreak} DAY
@@ -233,8 +235,8 @@ export default function StatsDashboardPage() {
             </div>
           </div>
 
-          {/* ─ Stats grid (2×2) ─ */}
-          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: isMobile ? '12px' : '18px' }}>
+          {/* ─ Stats grid (2×2 -> md:4 grid) ─ */}
+          <div className="w-full grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-[18px]">
             {statsLoading ? (
               <>
                 <SkeletonCard isMobile={isMobile} />
@@ -254,17 +256,7 @@ export default function StatsDashboardPage() {
         </div>
 
         {/* ── Weekly Tree Slots ── */}
-        <div
-          style={{
-            background: SUPER_WHITE,
-            border: `2px solid ${DARK}`,
-            boxShadow: SHADOW,
-            padding: isMobile ? '16px' : '32px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: isMobile ? '16px' : '32px',
-          }}
-        >
+        <div className="bg-[#FAFAFA] border-2 border-[#1A1A1A] p-4 md:p-8 flex flex-col gap-4 md:gap-8 overflow-x-auto w-full shadow-[4px_4px_0px_0px_#1A1A1A]">
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', flexWrap: 'wrap', gap: '8px' }}>
             <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 900, fontSize: isMobile ? '18px' : '30px', lineHeight: '1.2em', textTransform: 'uppercase', color: DARK }}>
               This Week
@@ -274,12 +266,13 @@ export default function StatsDashboardPage() {
             </span>
           </div>
 
-          <div style={{ display: 'flex', gap: '0px' }}>
-            {weekLoading
-              ? DAY_LABELS.map(d => (
-                  <div key={d} style={{ flex: '1 1 0', minHeight: isMobile ? '100px' : '200px', background: '#E8E8E8', animation: 'pulse 1.5s ease-in-out infinite', margin: '0 1px' }} />
-                ))
-              : DAY_LABELS.map((dayLabel, i) => {
+          <div className="w-full overflow-x-auto">
+            <div className="flex gap-0 min-w-[600px]">
+              {weekLoading
+                ? DAY_LABELS.map(d => (
+                    <div key={d} className="animate-pulse bg-[#E8E8E8] flex-1 min-w-[70px] mx-[1px]" style={{ minHeight: isMobile ? '100px' : '200px' }} />
+                  ))
+                : DAY_LABELS.map((dayLabel, i) => {
                   const dayData = weekDays[i];
                   const dateStr = dayData?.date || '';
                   const isPast = dateStr < todayStr;
@@ -331,42 +324,60 @@ export default function StatsDashboardPage() {
                     </div>
                   );
                 })}
+            </div>
           </div>
         </div>
 
         {/* ── Session History Log ── */}
-        <div
-          style={{
-            background: WHITE,
-            border: `2px solid ${DARK}`,
-            boxShadow: SHADOW,
-            padding: isMobile ? '16px' : '32px',
-            display: 'flex',
-            flexDirection: 'column',
-            gap: isMobile ? '16px' : '32px',
-            overflowX: 'auto',
-          }}
-        >
-          <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? '18px' : '30px', lineHeight: '1.2em', textTransform: 'uppercase', color: DARK }}>
-            Session History Log
-          </span>
+        <div className="bg-[#FFFFFF] border-2 border-[#1A1A1A] p-4 md:p-8 flex flex-col gap-4 md:gap-8 w-full overflow-x-auto shadow-[4px_4px_0px_0px_#1A1A1A]">
+          <div className="flex flex-col md:flex-row justify-between md:items-center gap-4">
+            <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? '18px' : '30px', lineHeight: '1.2em', textTransform: 'uppercase', color: DARK }}>
+              Session History Log
+            </span>
 
-          <div style={{ overflowX: 'auto' }}>
+            {/* Date Filters */}
+            <div className="flex flex-wrap items-center gap-2 md:gap-4">
+              <input
+                type="date"
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="bg-transparent border-2 border-[#1A1A1A] p-[6px_10px] text-[12px] md:text-[14px] font-bold font-['Space_Grotesk'] uppercase outline-none focus:border-[#006D37] transition-colors w-full md:w-auto min-w-[140px] lg:min-w-[180px]"
+                style={{ color: DARK }}
+              />
+              <span style={{ fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? '12px' : '14px', color: DARK }}>
+                TO
+              </span>
+              <input
+                type="date"
+                value={endDate}
+                onChange={(e) => setEndDate(e.target.value)}
+                className="bg-transparent border-2 border-[#1A1A1A] p-[6px_10px] text-[12px] md:text-[14px] font-bold font-['Space_Grotesk'] uppercase outline-none focus:border-[#006D37] transition-colors w-full md:w-auto min-w-[140px] lg:min-w-[180px]"
+                style={{ color: DARK }}
+              />
+              {(startDate || endDate) && (
+                <button
+                  onClick={() => { setStartDate(''); setEndDate(''); }}
+                  className="bg-[#1A1A1A] text-white px-3 py-2 text-[12px] md:text-[14px] font-bold font-['Space_Grotesk'] uppercase transition-colors hover:bg-[#006D37] active:scale-[0.97]"
+                >
+                  Clear
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="w-full overflow-x-auto">
             {sessionsLoading ? (
-              <div style={{ height: '200px', background: '#E8E8E8', animation: 'pulse 1.5s ease-in-out infinite', borderRadius: '4px' }} />
-            ) : sessions.length === 0 ? (
-              <div style={{ padding: '32px', textAlign: 'center', color: '#666', fontFamily: "'Inter', sans-serif", fontSize: '16px' }}>
-                No sessions yet. Start your first focus session!
+                <div className="w-full flex flex-col gap-[8px]">
+                  {[1, 2, 3, 4, 5].map(i => (
+                    <div key={i} className="animate-pulse bg-[#E8E8E8] h-[64px] rounded-[4px] w-full" />
+                  ))}
+                </div>
+              ) : sessions.length === 0 ? (
+              <div style={{ padding: '48px 0', textAlign: 'center', color: '#666', fontFamily: "'Inter', sans-serif", fontSize: '16px' }}>
+                The forest is quiet. Plant your first seed to begin.
               </div>
             ) : (
-              <table
-                style={{
-                  width: '100%',
-                  minWidth: isMobile ? '500px' : 'auto',
-                  borderCollapse: 'collapse',
-                  fontFamily: "'Inter', sans-serif",
-                }}
-              >
+              <table className="w-full border-collapse min-w-[600px]" style={{ fontFamily: "'Inter', sans-serif" }}>
                 <thead>
                   <tr style={{ borderBottom: `2px solid ${DARK}` }}>
                     {['DATE', 'VARIANT', 'DURATION', 'TASK', 'OUTCOME'].map(col => (
@@ -432,6 +443,28 @@ export default function StatsDashboardPage() {
                 </tbody>
               </table>
             )}
+            
+            {!sessionsLoading && sessionsData?.total && sessions.length < sessionsData.total && (
+              <div style={{ display: 'flex', justifyContent: 'center', marginTop: '20px' }}>
+                <button
+                  onClick={() => setLimit(l => l + 20)}
+                  className="min-h-[44px] min-w-[44px] transition-all duration-200 ease-out active:scale-[0.97] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                  style={{
+                    padding: '8px 24px',
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontWeight: 700,
+                    fontSize: isMobile ? '12px' : '14px',
+                    textTransform: 'uppercase',
+                    color: SUPER_WHITE,
+                    background: DARK,
+                    border: 'none',
+                    borderRadius: '4px',
+                  }}
+                >
+                  Load More
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -439,6 +472,7 @@ export default function StatsDashboardPage() {
         <div style={{ display: 'flex', justifyContent: 'center', paddingTop: '8px' }}>
           <button
             onClick={() => navigate('/dashboard')}
+            className="min-h-[44px] min-w-[44px] transition-all duration-200 ease-out active:scale-[0.97] hover:opacity-100 opacity-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               background: 'none',
               border: 'none',
@@ -449,12 +483,11 @@ export default function StatsDashboardPage() {
               color: DARK,
               textTransform: 'uppercase',
               letterSpacing: '2px',
-              opacity: 0.5,
-              transition: 'opacity 0.2s',
             }}
           >
             ← Back to Focus
           </button>
+        </div>
         </div>
       </main>
 

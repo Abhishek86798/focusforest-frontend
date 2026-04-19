@@ -7,7 +7,7 @@ import type { SessionVariant } from '../types';
 export interface VariantPickerModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onContinue: () => void;
+  onContinue: (variantKey: string) => void;
 }
 
 // ─── Variant data ──────────────────────────────────────────────────────────────
@@ -429,7 +429,7 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
               marginTop: isMobile ? 32 : 64,
             }}>
               <button
-                onClick={onContinue}
+                onClick={() => onContinue(selectedVariant as string)}
                 style={{
                   width: isMobile ? '100%' : 300, height: isMobile ? 52 : 64,
                   maxWidth: 300,
@@ -444,7 +444,7 @@ export default function VariantPickerModal({ isOpen, onClose, onContinue }: Vari
               </button>
 
               <button
-                onClick={onContinue}
+                onClick={() => onContinue(selectedVariant as string)}
                 style={{
                   background: 'none', border: 'none', cursor: 'pointer',
                   fontFamily: "'Space Grotesk', sans-serif", fontWeight: 700, fontSize: isMobile ? 12 : 16,

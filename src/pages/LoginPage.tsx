@@ -237,12 +237,13 @@ export default function LoginPage() {
               <button
                 type="button"
                 onClick={() => setShowPw(p => !p)}
+                className="min-h-[44px] min-w-[44px] transition-all duration-200 ease-out active:scale-[0.97] hover:bg-gray-100/10 rounded-full focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
                 style={{
                   position: 'absolute', right: '12px', top: '50%',
                   transform: 'translateY(-50%)',
                   background: 'none', border: 'none', cursor: 'pointer',
                   color: MUTED, fontSize: '12px', fontFamily: "'DM Sans', sans-serif",
-                  padding: '4px 6px', borderRadius: '4px',
+                  padding: '4px 6px',
                 }}
               >
                 {showPw ? 'Hide' : 'Show'}
@@ -256,11 +257,10 @@ export default function LoginPage() {
           </div>
 
           {/* Submit */}
-          <motion.button
+          <button
             type="submit"
             disabled={busy}
-            whileHover={busy ? {} : { scale: 1.01, y: -1 }}
-            whileTap={busy ? {} : { scale: 0.99 }}
+            className="transition-all duration-200 ease-out active:scale-[0.97] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               width: '100%',
               padding: '13px',
@@ -272,13 +272,11 @@ export default function LoginPage() {
               fontWeight: 600,
               fontFamily: "'DM Sans', sans-serif",
               letterSpacing: '0.02em',
-              cursor: busy ? 'not-allowed' : 'pointer',
               boxShadow: busy ? 'none' : '0 4px 16px rgba(76,175,80,0.25)',
-              transition: 'background 0.2s, box-shadow 0.2s',
             }}
           >
             {busy ? 'Entering the forest…' : 'Enter the forest →'}
-          </motion.button>
+          </button>
         </form>
 
         {/* ── Divider + signup link ── */}

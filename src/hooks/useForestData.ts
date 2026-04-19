@@ -1,5 +1,21 @@
 import { useQuery } from '@tanstack/react-query';
-import { treeApi, sessionApi, leaderboardApi, statsApi, groupApi, preferencesApi } from '../api';
+import { treeApi, sessionApi, leaderboardApi, statsApi, groupApi, preferencesApi, timerApi } from '../api';
+
+export function usePreferences() {
+  return useQuery({
+    queryKey: ['user', 'preferences'],
+    queryFn: preferencesApi.get,
+    staleTime: Infinity,
+  });
+}
+
+export function useTimerVariants() {
+  return useQuery({
+    queryKey: ['timer', 'variants'],
+    queryFn: timerApi.variants,
+    staleTime: Infinity,
+  });
+}
 
 /** Fetch today's live tree — auto-refreshes every 30 seconds during timer */
 export function useTreeToday() {

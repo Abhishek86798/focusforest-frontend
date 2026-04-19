@@ -13,6 +13,7 @@ import type {
   LeaderboardEntry,
   GroupLeaderboardEntry,
   StatsSummary,
+  SessionVariant,
 } from '../types';
 
 // ── Auth ──────────────────────────────────────────────────────────────────────
@@ -32,9 +33,19 @@ export const authApi = {
   /** Log out — clears httpOnly cookie on backend */
   logout: () => apiClient.post('/auth/logout'),
 
-  /** Update user profile (name, isPrivate, utcOffset) */
-  updateProfile: (data: { name?: string; isPrivate?: boolean; utcOffset?: number }) =>
+  /** Update user profile (name, isPrivate, utcOffset, default_variant) */
+  updateProfile: (data: { name?: string; isPrivate?: boolean; utcOffset?: number; default_variant?: string }) =>
     apiClient.patch<User>('/auth/profile', data).then(r => r.data),
+
+  /** Upload user avatar */
+  uploadAvatar: async (formData: FormData) => {
+    const response = await apiClient.post('/auth/avatar', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data;
+  },
 };
 
 // ── User Preferences ──────────────────────────────────────────────────────────
@@ -52,6 +63,11 @@ export const preferencesApi = {
   /** Update timer preference (selectedVariant, etc.) */
   update: (data: Partial<UserPreferences>) =>
     apiClient.patch<UserPreferences>('/user/preferences', data).then(r => r.data),
+};
+
+export const timerApi = {
+  /** Get available timer variants */
+  variants: () => apiClient.get<SessionVariant[]>('/timer/variants').then(r => r.data),
 };
 
 // ── Trees & Calendar ──────────────────────────────────────────────────────────

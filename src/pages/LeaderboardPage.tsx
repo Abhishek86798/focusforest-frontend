@@ -33,6 +33,7 @@ export interface RowEntry {
   trees: string;
   streak?: number;
   isMe: boolean;
+  avatarUrl?: string | null;
 }
 
 // ─── AvatarBadge ───────────────────────────────────────────────────────────────
@@ -180,31 +181,18 @@ function RankingTable({
   hasMore: boolean;
   isLoadingMore: boolean;
 }) {
-  const COL_GRID = isMobile ? '40px 1fr 80px' : '95px 1fr 220px 160px';
+  const COL_GRID = '95px 1fr 220px 160px'; // Enforced tailwind min-width
 
   return (
-    <div style={{
-      background: SUPERWHITE,
-      border: `1px solid ${DARK}`,
-      boxShadow: SHADOW,
-      borderRadius: 4,
-      overflow: 'hidden',
-    }}>
+    <div className="w-full overflow-x-auto">
+      <div className="bg-[#FAFAFA] border border-[#1A1A1A] shadow-[4px_4px_0px_0px_#1A1A1A] rounded-[4px] overflow-hidden min-w-[600px]">
 
       {/* Header row */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: COL_GRID,
-        alignItems: 'center',
-        padding: isMobile ? '0 16px' : '0 32px',
-        height: isMobile ? 48 : 63,
-        borderBottom: '1px solid rgba(26,26,26,0.12)',
-        boxSizing: 'border-box',
-      }}>
+      <div className="grid items-center px-4 md:px-8 xl:px-10 h-12 md:h-[63px] border-b border-[rgba(26,26,26,0.12)] box-border" style={{ gridTemplateColumns: COL_GRID }}>
         <span style={{
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: 700,
-          fontSize: isMobile ? 8 : 10,
+          fontSize: 10,
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
           color: DARK,
@@ -213,7 +201,7 @@ function RankingTable({
         <span style={{
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: 700,
-          fontSize: isMobile ? 8 : 10,
+          fontSize: 10,
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
           color: DARK,
@@ -222,62 +210,53 @@ function RankingTable({
         <span style={{
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: 700,
-          fontSize: isMobile ? 8 : 10,
+          fontSize: 10,
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
           color: DARK,
           textAlign: 'center',
-        }}>{isMobile ? 'Trees' : 'Trees Completed'}</span>
-        {!isMobile && (
-          <span style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontWeight: 700,
-            fontSize: 10,
-            textTransform: 'uppercase',
-            letterSpacing: '0.1em',
-            color: DARK,
-            textAlign: 'right',
-          }}>{isGroupMode ? 'Members' : 'Current Streak'}</span>
-        )}
+        }}>Trees Completed</span>
+        <span style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontWeight: 700,
+          fontSize: 10,
+          textTransform: 'uppercase',
+          letterSpacing: '0.1em',
+          color: DARK,
+          textAlign: 'right',
+        }}>{isGroupMode ? 'Members' : 'Current Streak'}</span>
       </div>
 
       {/* Data rows */}
       {rowsData.map((row, i) => (
-        <RankRow key={`${row.rank}-${row.name}`} row={row} index={i} isLast={i === rowsData.length - 1} isMobile={isMobile} />
+        <RankRow key={`${row.rank}-${row.name}`} row={row} index={i} isLast={i === rowsData.length - 1} />
       ))}
 
       {/* Show more */}
       <ShowMoreRow isMobile={isMobile} onLoadMore={onLoadMore} hasMore={hasMore} isLoading={isLoadingMore} />
+      </div>
     </div>
   );
 }
 
 function RankRow({
-  row, index, isLast, isMobile,
+  row, index, isLast,
 }: {
   row: RowEntry;
   index: number;
   isLast: boolean;
-  isMobile: boolean;
 }) {
   const me = row.isMe;
-  const COL_GRID = isMobile ? '40px 1fr 80px' : '95px 1fr 220px 160px';
+  const COL_GRID = '95px 1fr 220px 160px'; // Forced desktop grid layout to allow table scrolling
 
   return (
     <motion.div
       initial={{ opacity: 0, x: -8 }}
       animate={{ opacity: 1, x: 0 }}
       transition={{ delay: 0.15 + index * 0.07, duration: 0.28 }}
+      className={`grid items-center box-border ${me ? 'bg-[#006D37] border-t-2 border-b-2 border-t-[#006D37] border-b-[#006D37] shadow-[0px_4px_12px_0px_rgba(46,204,113,0.15)] px-4 py-4 md:px-8 md:py-6 xl:px-10 xl:py-8' : `bg-transparent border-b ${isLast ? 'border-b-transparent' : 'border-b-[rgba(26,26,26,0.1)]'} px-4 py-3 md:px-8 md:py-5 xl:px-10 xl:py-6`}`}
       style={{
-        display: 'grid',
         gridTemplateColumns: COL_GRID,
-        alignItems: 'center',
-        padding: me ? (isMobile ? '16px' : '24px 32px') : (isMobile ? '12px 16px' : '20px 32px'),
-        boxSizing: 'border-box',
-        background: me ? GREEN : 'transparent',
-        borderTop: me ? `2px solid ${GREEN}` : 'none',
-        borderBottom: me ? `2px solid ${GREEN}` : isLast ? 'none' : '1px solid rgba(26,26,26,0.1)',
-        boxShadow: me ? '0px 4px 12px 0px rgba(46, 204, 113, 0.15)' : 'none',
       }}
     >
       {/* Rank */}
@@ -285,7 +264,7 @@ function RankRow({
         <span style={{
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: me ? 700 : 900,
-          fontSize: me ? (isMobile ? 18 : 24) : (isMobile ? 14 : 20),
+          fontSize: me ? 24 : 20,
           color: me ? SUPERWHITE : DARK,
           lineHeight: me ? 1.333 : 1.4,
           display: 'block',
@@ -295,19 +274,36 @@ function RankRow({
       </div>
 
       {/* Name */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? 8 : 16 }}>
+      <div className="flex items-center gap-2 md:gap-4">
         <div style={{
-          width: me ? (isMobile ? 32 : 48) : (isMobile ? 28 : 40),
-          height: me ? (isMobile ? 32 : 48) : (isMobile ? 28 : 40),
-          borderRadius: isMobile ? 8 : 12,
+          width: me ? 48 : 40,
+          height: me ? 48 : 40,
+          borderRadius: 12,
           border: me ? `2px solid ${SUPERWHITE}` : `1px solid ${DARK}`,
           background: me ? 'rgba(255,255,255,0.12)' : 'transparent',
           flexShrink: 0,
-        }} />
+          overflow: 'hidden',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          {row.avatarUrl ? (
+            <img src={row.avatarUrl} alt={row.name} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+          ) : (
+            <span style={{ 
+              fontFamily: "'Space Grotesk', sans-serif", 
+              fontWeight: 700, 
+              fontSize: me ? 20 : 16, 
+              color: me ? SUPERWHITE : DARK 
+            }}>
+              {row.name.charAt(0).toUpperCase()}
+            </span>
+          )}
+        </div>
         <span style={{
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: 700,
-          fontSize: me ? (isMobile ? 14 : 18) : (isMobile ? 12 : 16),
+          fontSize: me ? 18 : 16,
           letterSpacing: '-0.025em',
           lineHeight: 1.5,
           color: me ? SUPERWHITE : DARK,
@@ -321,7 +317,7 @@ function RankRow({
         <span style={{
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: me ? 700 : 500,
-          fontSize: isMobile ? 10 : 12,
+          fontSize: 12,
           textTransform: 'uppercase',
           letterSpacing: '0.1em',
           color: me ? SUPERWHITE : DARK,
@@ -331,36 +327,34 @@ function RankRow({
         </span>
       </div>
 
-      {/* Streak (desktop only) */}
-      {!isMobile && (
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'flex-end',
-          gap: 6,
+      {/* Streak (now rendered across all resolutions via min-w 600px scrolling) */}
+      <div style={{
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 6,
+      }}>
+        <span style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontWeight: me ? 700 : 900,
+          fontSize: me ? 20 : 16,
+          color: me ? SUPERWHITE : GREEN,
+          lineHeight: 1.5,
+          textAlign: 'right',
         }}>
-          <span style={{
-            fontFamily: "'Space Grotesk', sans-serif",
-            fontWeight: me ? 700 : 900,
-            fontSize: me ? 20 : 16,
-            color: me ? SUPERWHITE : GREEN,
-            lineHeight: 1.5,
-            textAlign: 'right',
-          }}>
-            {row.streak}
-          </span>
-          <svg width="11" height="16" viewBox="0 0 11 16" fill="none">
-            <path
-              d="M5.5 0C5.5 0 9.5 3.8 9.5 7.5C9.5 9.8 7.6 11.5 5.5 11.5C3.4 11.5 1.5 9.8 1.5 7.5C1.5 6.7 1.9 5.4 1.9 5.4C1.9 5.4 2.8 7 3.8 7C3.8 4.4 5.5 2.6 5.5 0Z"
-              fill={me ? SUPERWHITE : GREEN}
-            />
-            <path
-              d="M5.5 9C5.5 9 7 10 7 11.3C7 12.55 6.38 13.5 5.5 13.5C4.62 13.5 4 12.55 4 11.3C4 10 5.5 9 5.5 9Z"
-              fill={me ? 'rgba(250,250,250,0.5)' : 'rgba(0,109,55,0.45)'}
-            />
-          </svg>
-        </div>
-      )}
+          {row.streak}
+        </span>
+        <svg width="11" height="16" viewBox="0 0 11 16" fill="none">
+          <path
+            d="M5.5 0C5.5 0 9.5 3.8 9.5 7.5C9.5 9.8 7.6 11.5 5.5 11.5C3.4 11.5 1.5 9.8 1.5 7.5C1.5 6.7 1.9 5.4 1.9 5.4C1.9 5.4 2.8 7 3.8 7C3.8 4.4 5.5 2.6 5.5 0Z"
+            fill={me ? SUPERWHITE : GREEN}
+          />
+          <path
+            d="M5.5 9C5.5 9 7 10 7 11.3C7 12.55 6.38 13.5 5.5 13.5C4.62 13.5 4 12.55 4 11.3C4 10 5.5 9 5.5 9Z"
+            fill={me ? 'rgba(250,250,250,0.5)' : 'rgba(0,109,55,0.45)'}
+          />
+        </svg>
+      </div>
     </motion.div>
   );
 }
@@ -374,20 +368,10 @@ function ShowMoreRow({ isMobile, onLoadMore, hasMore, isLoading }: {
   if (!hasMore) return null;
   
   return (
-    <div
+    <button
       onClick={onLoadMore}
-      style={{
-        display: 'flex',
-        justifyContent: 'center',
-        alignItems: 'center',
-        gap: 8,
-        padding: isMobile ? '20px 0' : '32px 0',
-        borderTop: '1px solid rgba(26,26,26,0.08)',
-        cursor: isLoading ? 'wait' : 'pointer',
-        opacity: isLoading ? 0.3 : 0.4,
-        transition: 'opacity 0.18s',
-        userSelect: 'none',
-      }}
+      disabled={isLoading}
+      className={`w-full flex justify-center items-center gap-2 py-5 md:py-8 border-t border-[rgba(26,26,26,0.08)] select-none min-h-[44px] transition-all duration-200 ease-out active:scale-[0.97] focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-30 disabled:cursor-wait ${isLoading ? 'opacity-30' : 'opacity-40 hover:opacity-100 cursor-pointer'}`}
     >
       <span style={{
         fontFamily: "'Space Grotesk', sans-serif",
@@ -407,7 +391,7 @@ function ShowMoreRow({ isMobile, onLoadMore, hasMore, isLoading }: {
           <path d="M1 1.5L5 5.5L9 1.5" stroke={DARK} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
         </svg>
       )}
-    </div>
+    </button>
   );
 }
 
@@ -420,7 +404,7 @@ function CategoryToggle({
   isMobile: boolean;
 }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: isMobile ? 12 : 20 }}>
+    <div className="flex flex-col items-center gap-3 md:gap-5">
       <span style={{
         fontFamily: "'Space Grotesk', sans-serif",
         fontWeight: 700,
@@ -432,22 +416,12 @@ function CategoryToggle({
         Category
       </span>
 
-      <div style={{
-        display: 'flex',
-        alignItems: 'stretch',
-        background: SUPERWHITE,
-        border: `1px solid ${DARK}`,
-        borderRadius: 4,
-        padding: 4,
-        width: isMobile ? 200 : 245,
-        height: isMobile ? 48 : 56,
-        boxSizing: 'border-box',
-        gap: 4,
-      }}>
+      <div className="bg-[#FAFAFA] border border-[#1A1A1A] rounded-[4px] p-1 flex items-stretch gap-1 box-border w-[200px] md:w-[245px] h-[52px] md:h-[56px]">
         {(['solo', 'groups'] as const).map(tab => (
           <button
             key={tab}
             onClick={() => onChange(tab)}
+            className="min-h-[44px] min-w-[44px] transition-all duration-200 ease-out active:scale-[0.97] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
             style={{
               flex: 1,
               border: 'none',
@@ -455,7 +429,6 @@ function CategoryToggle({
               background: active === tab ? GREEN : 'transparent',
               boxShadow: active === tab ? '0px 1px 2px 0px rgba(0,0,0,0.05)' : 'none',
               cursor: 'pointer',
-              transition: 'background 0.18s, opacity 0.18s',
               opacity: active === tab ? 1 : 0.5,
             }}
           >
@@ -560,21 +533,15 @@ export default function LeaderboardPage() {
     streak: category === 'solo' ? entry.currentStreak : entry.memberCount,
     // Use server-provided isCurrentUser flag (most reliable)
     isMe: category === 'solo' ? (entry.isCurrentUser ?? (user ? entry.userId === user.id : false)) : false,
+    avatarUrl: entry.avatarUrl,
   }));
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: BG }}>
       {!isMobile && <Sidebar activePage="leaderboard" />}
 
-      <main style={{
-        marginLeft: isMobile ? 0 : 101,
-        flex: 1,
-        display: 'flex',
-        flexDirection: 'column',
-        minHeight: '100vh',
-        boxSizing: 'border-box',
-        paddingBottom: isMobile ? 100 : 0,
-      }}>
+      <main className="flex-1 flex flex-col box-border ml-0 md:ml-[101px] h-screen overflow-y-auto overflow-x-hidden">
+        <div className="w-full px-4 md:px-8 lg:px-12 max-w-5xl lg:max-w-6xl xl:max-w-7xl 2xl:max-w-[1600px] mx-auto py-5 md:py-6 pb-[100px] md:pb-16 flex flex-col">
 
         {/* Mobile Header */}
         {isMobile && (
@@ -613,17 +580,20 @@ export default function LeaderboardPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.4 }}
           style={{
-            paddingLeft: isMobile ? '16px' : '6.5%',
-            paddingRight: isMobile ? '16px' : '6.5%',
+            width: '100%',
           }}
         >
           {isLoading && page === 1 ? (
-            <div style={{ textAlign: 'center', opacity: 0.5, padding: '40px 0' }}>Loading...</div>
+            <div className="w-full flex flex-col gap-2 mt-8 px-4">
+              {[1, 2, 3, 4, 5].map(i => (
+                <div key={i} className="animate-pulse bg-[#FAFAFA] border border-[rgba(26,26,26,0.08)] h-[64px] rounded-[4px] w-full" />
+              ))}
+            </div>
           ) : displayEntries.length > 0 ? (
             <Podium isMobile={isMobile} podiumData={podiumData} />
           ) : (
-            <div style={{ textAlign: 'center', opacity: 0.5, padding: '40px 0' }}>
-              No entries yet
+            <div className="py-12 text-center text-[#666] font-['Inter'] text-[14px] md:text-[16px]">
+              No focus warriors yet. Be the first!
             </div>
           )}
         </motion.div>
@@ -639,8 +609,7 @@ export default function LeaderboardPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.2, duration: 0.4 }}
             style={{
-              paddingLeft: isMobile ? '16px' : '7.5%',
-              paddingRight: isMobile ? '16px' : '7.5%',
+              width: '100%',
             }}
           >
             <RankingTable 
@@ -655,6 +624,7 @@ export default function LeaderboardPage() {
         )}
 
         <div style={{ height: isMobile ? 24 : 60 }} />
+        </div>
       </main>
 
       {isMobile && <MobileBottomNav activePage="leaderboard" />}

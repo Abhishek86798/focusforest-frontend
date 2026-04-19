@@ -92,6 +92,7 @@ export default function DayDetailPanel({
       <div style={{ display: 'flex', justifyContent: 'center', marginTop: '60px' }}>
         <button
           onClick={onClose}
+          className="transition-all duration-200 ease-out active:scale-[0.97] hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
           style={{
             display: 'flex',
             alignItems: 'center',
@@ -102,15 +103,6 @@ export default function DayDetailPanel({
             border: `2px solid ${DARK}`,
             boxShadow: BUTTON_SHADOW,
             cursor: 'pointer',
-            transition: 'transform 0.1s, opacity 0.15s'
-          }}
-          onMouseEnter={e => {
-            (e.currentTarget as HTMLButtonElement).style.opacity = '0.9';
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translate(-1px,-1px)';
-          }}
-          onMouseLeave={e => {
-            (e.currentTarget as HTMLButtonElement).style.opacity = '1';
-            (e.currentTarget as HTMLButtonElement).style.transform = 'translate(0px,0px)';
           }}
         >
           <span style={{
